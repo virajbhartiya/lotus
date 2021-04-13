@@ -488,7 +488,7 @@ var consnesusRunSlash = &cli.Command{
 }
 
 func runSlashing(ctx context.Context, from address.Address, fPath string, apiFull api.FullNode) error {
-	const forward = 0
+	const forward = 200
 
 	slashqFile, err := os.OpenFile(fPath, os.O_RDONLY, 0666)
 	if err != nil {
