@@ -33,6 +33,7 @@ import (
 
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/build"
+	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/stmgr"
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
@@ -676,6 +677,20 @@ func (mp *MessagePool) Push(ctx context.Context, m *types.SignedMessage) (cid.Ci
 		return cid.Undef, err
 	}
 
+	act, err := mp.api.GetActorAfter(m.Message.To, mp.curTs)
+	if err != nil {
+		return cid.Undef, xerrors.Errorf("transaction invalid. Cannot use ID address newer than finality")
+	}
+	isAccount := builtin.IsAccountActor(act.Code)
+
+	// Ensure ID addresses are older than finality
+	if isAccount && m.Message.To.Protocol() == address.ID {
+		_, err = mp.api.StateAccountKeyAtFinality(ctx, m.Message.To, mp.curTs)
+		if err != nil {
+			return cid.Undef, xerrors.Errorf("transaction invalid. Cannot use ID account address newer than finality")
+		}
+	}
+
 	// serialize push access to reduce lock contention
 	mp.addSema <- struct{}{}
 	defer func() {
@@ -1063,6 +1078,20 @@ func (mp *MessagePool) PushUntrusted(ctx context.Context, m *types.SignedMessage
 	err := mp.checkMessage(m)
 	if err != nil {
 		return cid.Undef, err
+	}
+
+	act, err := mp.api.GetActorAfter(m.Message.To, mp.curTs)
+	if err != nil {
+		return cid.Undef, xerrors.Errorf("transaction invalid. Cannot use ID address newer than finality")
+	}
+	isAccount := builtin.IsAccountActor(act.Code)
+
+	// Ensure ID addresses are older than finality
+	if isAccount && m.Message.To.Protocol() == address.ID {
+		_, err = mp.api.StateAccountKeyAtFinality(ctx, m.Message.To, mp.curTs)
+		if err != nil {
+			return cid.Undef, xerrors.Errorf("transaction invalid. Cannot use ID account address newer than finality")
+		}
 	}
 
 	// serialize push access to reduce lock contention
