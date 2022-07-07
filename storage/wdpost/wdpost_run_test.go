@@ -333,7 +333,7 @@ func TestWDPostDoPostPartLimitConfig(t *testing.T) {
 		journal:      journal.NilJournal(),
 		addrSel:      &ctladdr.AddressSelector{},
 
-		maxPartitionsPerMessage: userPartLimit,
+		maxPartitionsPerPostMessage: userPartLimit,
 	}
 
 	di := &dline.Info{
