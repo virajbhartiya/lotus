@@ -392,13 +392,13 @@ jobs:
           command: make build
           no_output_timeout: 30m
           environment:
-            GOARCH: amd64
+            GOARCH: arm64
             GOOS: darwin
       - run:
           command: make build
           no_output_timeout: 30m
           environment:
-            GOARCH: arm64
+            GOARCH: amd64
             GOOS: darwin
       - run:
           name: check tag and version output match
