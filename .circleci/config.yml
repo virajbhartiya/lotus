@@ -734,11 +734,21 @@ jobs:
               docker push filecoin/lotus:$CIRCLE_TAG
               docker push filecoin/lotus-all-in-one:$CIRCLE_TAG
             fi
+  cory-m1-test:
+    description: test self-hosted m1 runner
+    machine: true
+    resource_class: filecoin-project/self-hosted-m1
+    steps:
+      - checkout
+      - run:
+          name: "build test"
+          command: "FFI_BUILD_FROM_SOURCE=1 make lotus"
 
 workflows:
   version: 2.1
   ci:
     jobs:
+      - cory-m1-test
       - lint-all:
           concurrency: "16"   # expend all docker 2xlarge CPUs.
       - mod-tidy-check
