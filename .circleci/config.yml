@@ -744,6 +744,7 @@ jobs:
           name: "build test"
           command: |
             export PATH=/opt/homebrew/bin:$PATH
+            echo 1 | rustup-init
             FFI_BUILD_FROM_SOURCE=1 make lotus
 
 workflows:
