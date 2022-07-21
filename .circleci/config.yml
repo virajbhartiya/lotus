@@ -742,7 +742,9 @@ jobs:
       - checkout
       - run:
           name: "build test"
-          command: "FFI_BUILD_FROM_SOURCE=1 make lotus"
+          command: |
+            brew install go rustup-init
+            FFI_BUILD_FROM_SOURCE=1 make lotus
 
 workflows:
   version: 2.1
