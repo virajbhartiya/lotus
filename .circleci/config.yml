@@ -743,7 +743,7 @@ jobs:
       - run:
           name: "build test"
           command: |
-            export PATH=/opt/homebrew/bin/brew:$PATH
+            export PATH=/opt/homebrew/bin:$PATH
             FFI_BUILD_FROM_SOURCE=1 make lotus
 
 workflows:
