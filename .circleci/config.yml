@@ -743,7 +743,7 @@ jobs:
       - run:
           name: "build test"
           command: |
-            brew install go rustup-init
+            export PATH=/opt/homebrew/bin/brew
             FFI_BUILD_FROM_SOURCE=1 make lotus
 
 workflows:
