@@ -745,6 +745,7 @@ jobs:
           command: |
             export PATH=/opt/homebrew/bin:$PATH
             echo 1 | rustup-init
+            export PATH=$HOME/.cargo/bin:$PATH
             FFI_BUILD_FROM_SOURCE=1 make lotus
 
 workflows:
