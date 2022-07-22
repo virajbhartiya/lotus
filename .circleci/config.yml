@@ -746,6 +746,7 @@ jobs:
             export PATH=/opt/homebrew/bin:$PATH
             echo 1 | rustup-init
             export PATH=$HOME/.cargo/bin:$PATH
+            make deps
             sed 's/hwloc/libhwloc/'  extern/filecoin-ffi/filcrypto.pc > _changed
             mv _changed xtern/filecoin-ffi/filcrypto.pc
             FFI_BUILD_FROM_SOURCE=1 make lotus
