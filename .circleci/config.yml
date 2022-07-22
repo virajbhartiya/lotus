@@ -749,7 +749,7 @@ jobs:
             make deps
             sed 's/hwloc/libhwloc/'  extern/filecoin-ffi/filcrypto.pc > _changed
             mv _changed extern/filecoin-ffi/filcrypto.pc
-            FFI_BUILD_FROM_SOURCE=1 make lotus
+            make lotus
 
 workflows:
   version: 2.1
