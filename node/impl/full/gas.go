@@ -359,6 +359,8 @@ func (m *GasModule) GasEstimateMessageGas(ctx context.Context, msg *types.Messag
 			return nil, xerrors.Errorf("estimating gas used: %w", err)
 		}
 		msg.GasLimit = int64(float64(gasLimit) * m.Mpool.GetConfig().GasLimitOverestimation)
+
+		log.Warnw("setting gaslimit", "gaslimit", msg.GasLimit)
 	}
 
 	if msg.GasPremium == types.EmptyInt || types.BigCmp(msg.GasPremium, types.NewInt(0)) == 0 {
@@ -367,6 +369,7 @@ func (m *GasModule) GasEstimateMessageGas(ctx context.Context, msg *types.Messag
 			return nil, xerrors.Errorf("estimating gas price: %w", err)
 		}
 		msg.GasPremium = gasPremium
+		log.Warnw("setting gaspremium", "gaspremium", msg.GasPremium)
 	}
 
 	if msg.GasFeeCap == types.EmptyInt || types.BigCmp(msg.GasFeeCap, types.NewInt(0)) == 0 {
@@ -375,9 +378,11 @@ func (m *GasModule) GasEstimateMessageGas(ctx context.Context, msg *types.Messag
 			return nil, xerrors.Errorf("estimating fee cap: %w", err)
 		}
 		msg.GasFeeCap = feeCap
+		log.Warnw("setting gasfeecap", "gasfeecap", msg.GasFeeCap)
 	}
 
 	messagepool.CapGasFee(m.GetMaxFee, msg, spec)
+	log.Warnw("capping gasfeecap", "gasfeecap", msg.GasFeeCap)
 
 	return msg, nil
 }

@@ -161,6 +161,8 @@ func (a *MpoolAPI) MpoolPushMessage(ctx context.Context, msg *types.Message, spe
 		return nil, xerrors.Errorf("GasEstimateMessageGas error: %w", err)
 	}
 
+	log.Warnw("msg gas fees", "gaspremium", msg.GasPremium, "feecap", msg.GasFeeCap)
+
 	if msg.GasPremium.GreaterThan(msg.GasFeeCap) {
 		inJson, _ := json.Marshal(inMsg)
 		outJson, _ := json.Marshal(msg)
@@ -184,6 +186,7 @@ func (a *MpoolAPI) MpoolPushMessage(ctx context.Context, msg *types.Message, spe
 
 	// Sign and push the message
 	return a.MessageSigner.SignMessage(ctx, msg, func(smsg *types.SignedMessage) error {
+		log.Warnw("msg cid", "cid", smsg.Cid)
 		if _, err := a.MpoolModuleAPI.MpoolPush(ctx, smsg); err != nil {
 			return xerrors.Errorf("mpool push: failed to push message: %w", err)
 		}

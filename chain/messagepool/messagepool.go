@@ -204,6 +204,7 @@ func CapGasFee(mff dtypes.DefaultMaxFeeFunc, msg *types.Message, sendSpec *api.M
 	var maxFee abi.TokenAmount
 	if sendSpec != nil {
 		maxFee = sendSpec.MaxFee
+		log.Warnw("setting maxfee 1", "maxfee", maxFee)
 	}
 	if maxFee.Int == nil || maxFee.Equals(big.Zero()) {
 		mf, err := mff()
@@ -212,7 +213,10 @@ func CapGasFee(mff dtypes.DefaultMaxFeeFunc, msg *types.Message, sendSpec *api.M
 			mf = big.Zero()
 		}
 		maxFee = mf
+		log.Warnw("setting maxfee 2", "maxfee", maxFee)
 	}
+
+	log.Warnw("capping with maxfee", "maxfee", maxFee)
 
 	gl := types.NewInt(uint64(msg.GasLimit))
 	totalFee := types.BigMul(msg.GasFeeCap, gl)
