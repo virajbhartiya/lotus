@@ -153,7 +153,9 @@ func (handler *FetchHandler) remoteGetSector(w http.ResponseWriter, r *http.Requ
 		http.ServeFile(w, r, path)
 	}
 
-	log.Debugf("served sector file/dir, sectorID=%+v, fileType=%s, path=%s", id, ft, path)
+	//log.Debugf("served sector file/dir, sectorID=%+v, fileType=%s, path=%s", id, ft, path)
+	log.Debugf("served sector file/dir, sectorID=%+v, fileType=%s, path=%s, rangeh=%s", id, ft, path, r.Header["Range"])
+
 }
 
 func (handler *FetchHandler) remoteDeleteSector(w http.ResponseWriter, r *http.Request) {
