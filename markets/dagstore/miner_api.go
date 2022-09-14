@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/ipfs/go-cid"
@@ -168,10 +168,13 @@ func (m *minerAPI) FetchUnsealedPiece(ctx context.Context, pieceCid cid.Cid) (mo
 		}
 
 		if reader != nil {
-			b, err := ioutil.ReadAll(reader)
+			b := make([]byte, deal.Length.Unpadded())
+			n, err := io.ReadFull(reader, b)
 			if err != nil {
 				return nil, err
 			}
+
+			_ = n
 
 			m.pieces.Add(pieceCid, b)
 
