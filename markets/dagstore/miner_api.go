@@ -1,9 +1,12 @@
 package dagstore
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io/ioutil"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/ipfs/go-cid"
 	"golang.org/x/xerrors"
 
@@ -36,6 +39,8 @@ type minerAPI struct {
 	throttle       throttle.Throttler
 	unsealThrottle throttle.Throttler
 	readyMgr       *shared.ReadyManager
+
+	pieces *lru.Cache
 }
 
 var _ MinerAPI = (*minerAPI)(nil)
@@ -47,12 +52,14 @@ func NewMinerAPI(store piecestore.PieceStore, sa SectorAccessor, concurrency int
 	} else {
 		unsealThrottle = throttle.Fixed(unsealConcurrency)
 	}
+	pieces, _ := lru.New(1000)
 	return &minerAPI{
 		pieceStore:     store,
 		sa:             sa,
 		throttle:       throttle.Fixed(concurrency),
 		unsealThrottle: unsealThrottle,
 		readyMgr:       shared.NewReadyManager(),
+		pieces:         pieces,
 	}
 }
 
@@ -109,6 +116,13 @@ func (m *minerAPI) IsUnsealed(ctx context.Context, pieceCid cid.Cid) (bool, erro
 }
 
 func (m *minerAPI) FetchUnsealedPiece(ctx context.Context, pieceCid cid.Cid) (mount.Reader, error) {
+	if cachedBytes, ok := m.pieces.Get(pieceCid); ok {
+
+		buf := bytes.NewReader(cachedBytes.([]byte))
+
+		return &BufferWithClose{buf}, nil
+	}
+
 	err := m.readyMgr.AwaitReady()
 	if err != nil {
 		return nil, err
@@ -154,8 +168,17 @@ func (m *minerAPI) FetchUnsealedPiece(ctx context.Context, pieceCid cid.Cid) (mo
 		}
 
 		if reader != nil {
+			b, err := ioutil.ReadAll(reader)
+			if err != nil {
+				return nil, err
+			}
+
+			m.pieces.Add(pieceCid, b)
+
+			buf := bytes.NewReader(b)
+
 			// we were able to obtain a reader for an already unsealed piece
-			return reader, nil
+			return &BufferWithClose{buf}, nil
 		}
 	}
 
@@ -180,6 +203,7 @@ func (m *minerAPI) FetchUnsealedPiece(ctx context.Context, pieceCid cid.Cid) (mo
 		}
 
 		// Successfully fetched the deal data so return a reader over the data
+
 		return reader, nil
 	}
 
@@ -204,4 +228,12 @@ func (m *minerAPI) GetUnpaddedCARSize(ctx context.Context, pieceCid cid.Cid) (ui
 	len := pieceInfo.Deals[0].Length
 
 	return uint64(len), nil
+}
+
+type BufferWithClose struct {
+	*bytes.Reader
+}
+
+func (b *BufferWithClose) Close() error {
+	return nil
 }
