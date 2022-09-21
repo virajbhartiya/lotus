@@ -192,6 +192,7 @@ func (p *pieceReader) readAtUnlocked(b []byte, off int64) (n int, err error) {
 		err = io.EOF
 	}
 
+	log.Debugw("pieceReader allreads", "piece", p.pieceCid, "at", p.rAt, "toEnd", int64(p.len)-p.rAt, "n", len(b), "read", n, "err", err)
 	p.rAt += int64(n)
 	return n, err
 }
