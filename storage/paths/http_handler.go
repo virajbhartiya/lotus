@@ -86,6 +86,9 @@ func (handler *FetchHandler) remoteStatFs(w http.ResponseWriter, r *http.Request
 // remoteGetSector returns the sector file/tared directory byte stream for the sectorID and sector file type sent in the request.
 // returns an error if it does NOT have the required sector file/dir.
 func (handler *FetchHandler) remoteGetSector(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+	var beforeData time.Duration
+
 	vars := mux.Vars(r)
 
 	id, err := storiface.ParseSectorID(vars["id"])
@@ -149,13 +152,16 @@ func (handler *FetchHandler) remoteGetSector(w http.ResponseWriter, r *http.Requ
 		}
 	} else {
 		w.Header().Set("Content-Type", "application/octet-stream")
+
+		beforeData = time.Since(start)
 		// will do a ranged read over the file at the given path if the caller has asked for a ranged read in the request headers.
 		http.ServeFile(w, r, path)
 	}
 
-	//log.Debugf("served sector file/dir, sectorID=%+v, fileType=%s, path=%s", id, ft, path)
-	log.Debugf("served sector file/dir, sectorID=%+v, fileType=%s, path=%s, rangeh=%s", id, ft, path, r.Header["Range"])
+	afterData := time.Since(start)
 
+	//log.Debugf("served sector file/dir, sectorID=%+v, fileType=%s, path=%s", id, ft, path)
+	log.Debugf("served sector file/dir, sectorID=%+v, fileType=%s, path=%s, rangeh=%s before=%d after=%d", id, ft, path, r.Header["Range"], beforeData.Milliseconds(), afterData.Milliseconds())
 }
 
 func (handler *FetchHandler) remoteDeleteSector(w http.ResponseWriter, r *http.Request) {
