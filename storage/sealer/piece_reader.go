@@ -171,6 +171,8 @@ func (p *pieceReader) readAtUnlocked(b []byte, off int64) (n int, err error) {
 	if off > p.rAt {
 		stats.Record(p.ctx, metrics.DagStorePRBytesDiscarded.M(off-p.rAt), metrics.DagStorePRDiscardCount.M(1))
 
+		log.Debugw("pieceReader discard", "discard", off-p.rAt, "piece", p.pieceCid)
+
 		n, err := io.CopyN(io.Discard, p.br, off-p.rAt)
 		p.rAt += n
 		if err != nil {
