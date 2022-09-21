@@ -98,6 +98,8 @@ func (p *pieceProvider) tryReadUnsealedPiece(ctx context.Context, pc cid.Cid, se
 	pr, err := (&pieceReader{
 		ctx: ctx,
 		getReader: func(ctx context.Context, startOffset uint64) (io.ReadCloser, error) {
+			log.Debugw("new getReader", "piececid", pc, "startoffset", startOffset)
+
 			startOffsetAligned := storiface.UnpaddedByteIndex(startOffset / 127 * 127) // floor to multiple of 127
 
 			r, err := rg(startOffsetAligned.Padded())
