@@ -631,6 +631,8 @@ func (r *Remote) CheckIsUnsealed(ctx context.Context, s storiface.SectorRef, off
 // 2. no worker(local worker included) has the unsealed piece in their unsealed sector file.
 // Will return a nil reader and a nil error in such a case.
 func (r *Remote) Reader(ctx context.Context, s storiface.SectorRef, offset, size abi.PaddedPieceSize) (func(startOffsetAligned storiface.PaddedByteIndex) (io.ReadCloser, error), error) {
+
+	log.Debugw("remote.Reader", "offset", offset)
 	ft := storiface.FTUnsealed
 
 	// check if we have the unsealed sector file locally
@@ -640,6 +642,8 @@ func (r *Remote) Reader(ctx context.Context, s storiface.SectorRef, offset, size
 	}
 
 	path := storiface.PathByType(paths, ft)
+
+	log.Debugw("remote.Reader", "offset", offset, "path", path)
 
 	if path != "" {
 		// if we have the unsealed file locally, return a reader that can be used to read the contents of the
