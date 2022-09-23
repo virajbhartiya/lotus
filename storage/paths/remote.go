@@ -9,6 +9,7 @@ import (
 	"math/bits"
 	"mime"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
 	gopath "path"
@@ -16,6 +17,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"golang.org/x/xerrors"
@@ -487,6 +489,10 @@ func (r *Remote) FsStat(ctx context.Context, id storiface.ID) (fsutil.FsStat, er
 }
 
 func (r *Remote) readRemote(ctx context.Context, url string, offset, size abi.PaddedPieceSize) (io.ReadCloser, error) {
+	start := time.Now()
+
+	log.Infow("readRemote", "url", url, "offset", offset)
+
 	if len(r.limit) >= cap(r.limit) {
 		log.Infof("Throttling remote read, %d already running", len(r.limit))
 	}
@@ -512,6 +518,14 @@ func (r *Remote) readRemote(ctx context.Context, url string, offset, size abi.Pa
 	}
 	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", offset, offset+size-1))
 	req = req.WithContext(ctx)
+
+	trace := &httptrace.ClientTrace{
+		GotFirstResponseByte: func() {
+			log.Infow("readRemote", "time from start to first byte", time.Since(start).Milliseconds())
+		},
+	}
+
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
