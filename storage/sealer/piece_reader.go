@@ -15,6 +15,11 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 
 	"github.com/filecoin-project/lotus/metrics"
+	trace "go.opentelemetry.io/otel/trace"
+)
+
+var (
+	Tracer trace.Tracer
 )
 
 // For small read skips, it's faster to "burn" some bytes than to setup new sector reader.
@@ -26,6 +31,8 @@ type pieceGetter func(ctx context.Context, offset uint64) (io.ReadCloser, error)
 
 type pieceReader struct {
 	ctx       context.Context
+	name      string
+	span      trace.Span
 	getReader pieceGetter
 	pieceCid  cid.Cid
 	len       abi.UnpaddedPieceSize
@@ -42,6 +49,8 @@ type pieceReader struct {
 
 func (p *pieceReader) init() (_ *pieceReader, err error) {
 	stats.Record(p.ctx, metrics.DagStorePRInitCount.M(1))
+
+	p.ctx, p.span = Tracer.Start(p.ctx, p.name)
 
 	p.rAt = 0
 	p.r, err = p.getReader(p.ctx, uint64(p.rAt))
@@ -69,6 +78,8 @@ func (p *pieceReader) Close() error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	p.span.End()
+
 	if err := p.check(); err != nil {
 		return err
 	}
@@ -94,13 +105,19 @@ func (p *pieceReader) Read(b []byte) (int, error) {
 	start := time.Now()
 	p.mu.Lock()
 	defer p.mu.Unlock()
+
+	var ctx context.Context
+	var span trace.Span
+	ctx, span = Tracer.Start(p.ctx, "pr.read")
+	defer span.End()
+
 	lockAcquireDuration := time.Since(start)
 
 	if err := p.check(); err != nil {
 		return 0, err
 	}
 
-	n, err := p.readAtUnlocked(b, p.seqAt, lockAcquireDuration)
+	n, err := p.readAtUnlocked(ctx, b, p.seqAt, lockAcquireDuration)
 	p.seqAt += int64(n)
 	return n, err
 }
@@ -133,10 +150,15 @@ func (p *pieceReader) ReadAt(b []byte, off int64) (n int, err error) {
 	defer p.mu.Unlock()
 	lockAcquireDuration := time.Since(start)
 
-	return p.readAtUnlocked(b, off, lockAcquireDuration)
+	var ctx context.Context
+	var span trace.Span
+	ctx, span = Tracer.Start(p.ctx, "pr.readAt")
+	defer span.End()
+
+	return p.readAtUnlocked(ctx, b, off, lockAcquireDuration)
 }
 
-func (p *pieceReader) readAtUnlocked(b []byte, off int64, lockAcqDuration time.Duration) (n int, err error) {
+func (p *pieceReader) readAtUnlocked(ctx context.Context, b []byte, off int64, lockAcqDuration time.Duration) (n int, err error) {
 	start := time.Now()
 	if err := p.check(); err != nil {
 		return 0, err
@@ -166,7 +188,7 @@ func (p *pieceReader) readAtUnlocked(b []byte, off int64, lockAcqDuration time.D
 		}
 
 		p.rAt = off
-		p.r, err = p.getReader(p.ctx, uint64(p.rAt))
+		p.r, err = p.getReader(ctx, uint64(p.rAt))
 		p.br = bufio.NewReaderSize(p.r, ReadBuf)
 		if err != nil {
 			return 0, xerrors.Errorf("getting backing reader: %w", err)
@@ -191,6 +213,9 @@ func (p *pieceReader) readAtUnlocked(b []byte, off int64, lockAcqDuration time.D
 		return 0, xerrors.Errorf("bad reader offset; requested %d; at %d", off, p.rAt)
 	}
 
+	var span trace.Span
+	p.ctx, span = Tracer.Start(p.ctx, "pr.actual_read")
+
 	// 4. Read!
 	readStart := time.Now()
 	n, err = io.ReadFull(p.br, b)
@@ -200,6 +225,8 @@ func (p *pieceReader) readAtUnlocked(b []byte, off int64, lockAcqDuration time.D
 	if err == io.ErrUnexpectedEOF {
 		err = io.EOF
 	}
+
+	span.End()
 
 	log.Debugw("pieceReader allreads",
 		"piece", p.pieceCid, "at", p.rAt, "toEnd", int64(p.len)-p.rAt,

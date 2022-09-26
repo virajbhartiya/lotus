@@ -3,9 +3,12 @@ package sealer
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
+	"sync"
 
 	"github.com/ipfs/go-cid"
+	trace "go.opentelemetry.io/otel/trace"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/dagstore/mount"
@@ -14,6 +17,11 @@ import (
 	"github.com/filecoin-project/lotus/storage/paths"
 	"github.com/filecoin-project/lotus/storage/sealer/fr32"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
+)
+
+var (
+	prI int
+	mu  sync.Mutex
 )
 
 type Unsealer interface {
@@ -95,14 +103,25 @@ func (p *pieceProvider) tryReadUnsealedPiece(ctx context.Context, pc cid.Cid, se
 
 	buf := make([]byte, fr32.BufSize(size.Padded()))
 
+	var prName string
+	mu.Lock()
+	prName = fmt.Sprintf("pr.init_%d", prI)
+	prI = prI + 1
+	mu.Unlock()
+
 	pr, err := (&pieceReader{
-		ctx: ctx,
+		ctx:  ctx,
+		name: prName,
 		getReader: func(ctx context.Context, startOffset uint64) (io.ReadCloser, error) {
 			log.Debugw("new getReader", "piececid", pc, "startoffset", startOffset)
 
+			var span trace.Span
+			ctx, span = Tracer.Start(ctx, "pr.getReader")
+			defer span.End()
+
 			startOffsetAligned := storiface.UnpaddedByteIndex(startOffset / 127 * 127) // floor to multiple of 127
 
-			r, err := rg(startOffsetAligned.Padded())
+			r, err := rg(ctx, startOffsetAligned.Padded())
 			if err != nil {
 				return nil, xerrors.Errorf("getting reader at +%d: %w", startOffsetAligned, err)
 			}
