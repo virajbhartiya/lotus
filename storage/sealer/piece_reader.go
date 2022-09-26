@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"sync"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	"go.opencensus.io/stats"
@@ -90,14 +91,16 @@ func (p *pieceReader) Close() error {
 }
 
 func (p *pieceReader) Read(b []byte) (int, error) {
+	start := time.Now()
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	lockAcquireDuration := time.Since(start)
 
 	if err := p.check(); err != nil {
 		return 0, err
 	}
 
-	n, err := p.readAtUnlocked(b, p.seqAt)
+	n, err := p.readAtUnlocked(b, p.seqAt, lockAcquireDuration)
 	p.seqAt += int64(n)
 	return n, err
 }
@@ -125,13 +128,16 @@ func (p *pieceReader) Seek(offset int64, whence int) (int64, error) {
 }
 
 func (p *pieceReader) ReadAt(b []byte, off int64) (n int, err error) {
+	start := time.Now()
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	lockAcquireDuration := time.Since(start)
 
-	return p.readAtUnlocked(b, off)
+	return p.readAtUnlocked(b, off, lockAcquireDuration)
 }
 
-func (p *pieceReader) readAtUnlocked(b []byte, off int64) (n int, err error) {
+func (p *pieceReader) readAtUnlocked(b []byte, off int64, lockAcqDuration time.Duration) (n int, err error) {
+	start := time.Now()
 	if err := p.check(); err != nil {
 		return 0, err
 	}
@@ -186,6 +192,7 @@ func (p *pieceReader) readAtUnlocked(b []byte, off int64) (n int, err error) {
 	}
 
 	// 4. Read!
+	readStart := time.Now()
 	n, err = io.ReadFull(p.br, b)
 	if n < len(b) {
 		log.Debugw("pieceReader short read", "piece", p.pieceCid, "at", p.rAt, "toEnd", int64(p.len)-p.rAt, "n", len(b), "read", n, "err", err)
@@ -194,7 +201,8 @@ func (p *pieceReader) readAtUnlocked(b []byte, off int64) (n int, err error) {
 		err = io.EOF
 	}
 
-	log.Debugw("pieceReader allreads", "piece", p.pieceCid, "at", p.rAt, "toEnd", int64(p.len)-p.rAt, "n", len(b), "read", n, "err", err)
+	log.Debugw("pieceReader allreads", "piece", p.pieceCid, "at", p.rAt, "toEnd", int64(p.len)-p.rAt,
+		"n", len(b), "read", n, "err", err, "read-duration", time.Since(readStart), "total-duration", time.Since(start), "lock-acquire-duration", lockAcqDuration)
 	p.rAt += int64(n)
 	return n, err
 }

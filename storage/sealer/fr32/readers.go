@@ -3,11 +3,16 @@ package fr32
 import (
 	"io"
 	"math/bits"
+	"time"
+
+	logging "github.com/ipfs/go-log/v2"
 
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
 )
+
+var log = logging.Logger("advmgr")
 
 type unpadReader struct {
 	src io.Reader
@@ -40,6 +45,8 @@ func NewUnpadReaderBuf(src io.Reader, sz abi.PaddedPieceSize, buf []byte) (io.Re
 }
 
 func (r *unpadReader) Read(out []byte) (int, error) {
+	start := time.Now()
+
 	if r.left == 0 {
 		return 0, io.EOF
 	}
@@ -59,6 +66,7 @@ func (r *unpadReader) Read(out []byte) (int, error) {
 
 	r.left -= uint64(todo)
 
+	readStart := time.Now()
 	n, err := io.ReadAtLeast(r.src, r.work[:todo], int(todo))
 	if err != nil && err != io.EOF {
 		return n, err
@@ -67,7 +75,10 @@ func (r *unpadReader) Read(out []byte) (int, error) {
 		return 0, xerrors.Errorf("didn't read enough: %d / %d, left %d, out %d", n, todo, r.left, len(out))
 	}
 
+	readDuration := time.Since(readStart)
+	unpadStart := time.Now()
 	Unpad(r.work[:todo], out[:todo.Unpadded()])
+	log.Debugw("unpadReader Read", "read-duration", readDuration, "unpad-duration", time.Since(unpadStart), "total-duration", time.Since(start))
 
 	return int(todo.Unpadded()), err
 }
