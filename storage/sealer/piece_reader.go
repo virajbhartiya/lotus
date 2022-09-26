@@ -51,6 +51,10 @@ func (p *pieceReader) init() (_ *pieceReader, err error) {
 	stats.Record(p.ctx, metrics.DagStorePRInitCount.M(1))
 
 	p.ctx, p.span = Tracer.Start(p.ctx, p.name)
+	go func() {
+		time.Sleep(4 * 60 * time.Second)
+		p.span.End()
+	}()
 
 	p.rAt = 0
 	p.r, err = p.getReader(p.ctx, uint64(p.rAt))
@@ -214,7 +218,7 @@ func (p *pieceReader) readAtUnlocked(ctx context.Context, b []byte, off int64, l
 	}
 
 	var span trace.Span
-	p.ctx, span = Tracer.Start(p.ctx, "pr.actual_read")
+	_, span = Tracer.Start(ctx, "pr.actual_read")
 
 	// 4. Read!
 	readStart := time.Now()
