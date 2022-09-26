@@ -201,8 +201,12 @@ func (p *pieceReader) readAtUnlocked(b []byte, off int64, lockAcqDuration time.D
 		err = io.EOF
 	}
 
-	log.Debugw("pieceReader allreads", "piece", p.pieceCid, "at", p.rAt, "toEnd", int64(p.len)-p.rAt,
-		"n", len(b), "read", n, "err", err, "read-duration", time.Since(readStart), "total-duration", time.Since(start), "lock-acquire-duration", lockAcqDuration)
+	log.Debugw("pieceReader allreads",
+		"piece", p.pieceCid, "at", p.rAt, "toEnd", int64(p.len)-p.rAt,
+		"n", len(b), "read", n, "err", err,
+		"total-duration-ms", time.Since(start).Milliseconds(),
+		"read-duration-ms", time.Since(readStart).Milliseconds(),
+		"lock-acquire-duration-ms", lockAcqDuration.Milliseconds())
 	p.rAt += int64(n)
 	return n, err
 }

@@ -92,12 +92,14 @@ func NewRemote(local Store, index SectorIndex, auth http.Header, fetchLimit int,
 }
 
 func (r *Remote) AcquireSector(ctx context.Context, s storiface.SectorRef, existing storiface.SectorFileType, allocate storiface.SectorFileType, pathType storiface.PathType, op storiface.AcquireMode) (storiface.SectorPaths, storiface.SectorPaths, error) {
+	start := time.Now()
 	if existing|allocate != existing^allocate {
 		return storiface.SectorPaths{}, storiface.SectorPaths{}, xerrors.New("can't both find and allocate a sector")
 	}
 
 	// First make sure that no other goroutines are trying to fetch this sector;
 	// wait if there are any.
+	lkWaitStart := time.Now()
 	for {
 		r.fetchLk.Lock()
 
@@ -126,6 +128,7 @@ func (r *Remote) AcquireSector(ctx context.Context, s storiface.SectorRef, exist
 	}()
 
 	// Try to get the sector from local storage
+	localAcquireStart := time.Now()
 	paths, stores, err := r.local.AcquireSector(ctx, s, existing, allocate, pathType, op)
 	if err != nil {
 		return storiface.SectorPaths{}, storiface.SectorPaths{}, xerrors.Errorf("local acquire error: %w", err)
@@ -162,6 +165,7 @@ func (r *Remote) AcquireSector(ctx context.Context, s storiface.SectorRef, exist
 	}
 	defer releaseStorage()
 
+	remoteAcquireStart := time.Now()
 	for _, fileType := range storiface.PathTypes {
 		if fileType&existing == 0 {
 			continue
@@ -195,6 +199,11 @@ func (r *Remote) AcquireSector(ctx context.Context, s storiface.SectorRef, exist
 		}
 	}
 
+	log.Debugw("AcquireSector", "sector", s.ID,
+		"local-acquire", time.Since(localAcquireStart).Milliseconds(),
+		"remote-acquire", time.Since(remoteAcquireStart).Milliseconds(),
+		"total-acquire", time.Since(start).Milliseconds(),
+		"sector-lock-wait", time.Since(lkWaitStart).Milliseconds())
 	return paths, stores, nil
 }
 
@@ -632,10 +641,10 @@ func (r *Remote) CheckIsUnsealed(ctx context.Context, s storiface.SectorRef, off
 // Will return a nil reader and a nil error in such a case.
 func (r *Remote) Reader(ctx context.Context, s storiface.SectorRef, offset, size abi.PaddedPieceSize) (func(startOffsetAligned storiface.PaddedByteIndex) (io.ReadCloser, error), error) {
 
-	log.Debugw("remote.Reader", "offset", offset)
 	ft := storiface.FTUnsealed
 
 	// check if we have the unsealed sector file locally
+	acquireStart := time.Now()
 	paths, _, err := r.local.AcquireSector(ctx, s, ft, storiface.FTNone, storiface.PathStorage, storiface.AcquireMove)
 	if err != nil {
 		return nil, xerrors.Errorf("acquire local: %w", err)
@@ -643,7 +652,8 @@ func (r *Remote) Reader(ctx context.Context, s storiface.SectorRef, offset, size
 
 	path := storiface.PathByType(paths, ft)
 
-	log.Debugw("remote.Reader", "offset", offset, "path", path)
+	log.Debugw("remote.Reader", "offset", offset, "path", path,
+		"acquire-duration-ms", time.Since(acquireStart).Milliseconds())
 
 	if path != "" {
 		// if we have the unsealed file locally, return a reader that can be used to read the contents of the
