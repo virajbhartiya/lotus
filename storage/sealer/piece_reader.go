@@ -52,7 +52,7 @@ func (p *pieceReader) init() (_ *pieceReader, err error) {
 
 	p.ctx, p.span = Tracer.Start(p.ctx, p.name)
 	go func() {
-		time.Sleep(4 * 60 * time.Second)
+		time.Sleep(2 * 60 * time.Second)
 		p.span.End()
 	}()
 

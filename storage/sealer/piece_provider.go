@@ -116,7 +116,7 @@ func (p *pieceProvider) tryReadUnsealedPiece(ctx context.Context, pc cid.Cid, se
 			log.Debugw("new getReader", "piececid", pc, "startoffset", startOffset)
 
 			var span trace.Span
-			ctx, span = Tracer.Start(ctx, "pr.getReader")
+			_, span = Tracer.Start(ctx, "pr.getReader")
 			defer span.End()
 
 			startOffsetAligned := storiface.UnpaddedByteIndex(startOffset / 127 * 127) // floor to multiple of 127
