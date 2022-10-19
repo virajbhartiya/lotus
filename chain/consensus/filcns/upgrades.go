@@ -1496,7 +1496,7 @@ func upgradeActorsV9Common(
 	store := store.ActorStore(ctx, writeStore)
 
 	// ensure that the manifest is loaded in the blockstore
-	if err := bundle.LoadBundles(ctx, buf, actorstypes.Version9); err != nil {
+	if err := bundle.LoadBundles(ctx, writeStore, actorstypes.Version9); err != nil {
 		return cid.Undef, xerrors.Errorf("failed to load manifest bundle: %w", err)
 	}
 
