@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -22,7 +23,7 @@ import (
 	miner9 "github.com/filecoin-project/go-state-types/builtin/v9/miner"
 	adt9 "github.com/filecoin-project/go-state-types/builtin/v9/util/adt"
 	verifreg9 "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
-	"github.com/filecoin-project/specs-actors/v7/actors/migration/nv15"
+	"github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors"
@@ -42,6 +43,22 @@ import (
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/sealer/ffiwrapper"
 )
+
+type NullMigrationCache struct{}
+
+func (_ NullMigrationCache) Write(key string, value cid.Cid) error {
+	return nil
+}
+func (_ NullMigrationCache) Read(key string) (bool, cid.Cid, error) {
+	return false, cid.Undef, nil
+}
+func (_ NullMigrationCache) Load(key string, loadFunc func() (cid.Cid, error)) (cid.Cid, error) {
+	c, err := loadFunc()
+	if err != nil {
+		return cid.Undef, err
+	}
+	return c, nil
+}
 
 var migrationsCmd = &cli.Command{
 	Name:        "migrate-nv17",
@@ -103,7 +120,7 @@ var migrationsCmd = &cli.Command{
 			return err
 		}
 
-		cache := nv15.NewMemMigrationCache()
+		//cache := nv15.NewMemMigrationCache()
 
 		blk, err := cs.GetBlock(ctx, blkCid)
 		if err != nil {
@@ -115,12 +132,11 @@ var migrationsCmd = &cli.Command{
 			return err
 		}
 
-		ts1, err := cs.GetTipsetByHeight(ctx, blk.Height-180, migrationTs, false)
+		startTime := time.Now()
+		/*ts1, err := cs.GetTipsetByHeight(ctx, blk.Height-180, migrationTs, false)
 		if err != nil {
 			return err
 		}
-
-		startTime := time.Now()
 
 		err = filcns.PreUpgradeActorsV9(ctx, sm, cache, ts1.ParentState(), ts1.Height()-1, ts1)
 		if err != nil {
@@ -137,24 +153,44 @@ var migrationsCmd = &cli.Command{
 		fmt.Println("completed round actual (with cache), took ", time.Since(startTime))
 
 		fmt.Println("new cid", newCid1)
-
-		newCid2, err := filcns.UpgradeActorsV9(ctx, sm, nv15.NewMemMigrationCache(), nil, blk.ParentStateRoot, blk.Height-1, migrationTs)
+		*/
+		newCid2, err := filcns.UpgradeActorsV9(ctx, sm, NullMigrationCache{}, nil, blk.ParentStateRoot, blk.Height-1, migrationTs)
 		if err != nil {
 			return err
 		}
 		fmt.Println("completed round actual (without cache), took ", time.Since(startTime))
 
 		fmt.Println("new cid", newCid2)
-
-		if newCid1 != newCid2 {
-			return xerrors.Errorf("got different results with and without the cache: %s, %s", newCid1,
-				newCid2)
-		}
-
-		err = checkStateInvariants(ctx, blk.ParentStateRoot, newCid1, bs)
+		msg := types.Message{}
+		err = json.Unmarshal([]byte(`{
+  "Version": 0,
+  "To": "f05",
+  "From": "f3sf6gf4lcb27varcyq6jqryvs75hhbsz5gzqlsgykpftf5ce4php4hiwrkogmfz2ussy7tcauayhyiid5bxeq",
+  "Nonce": 222,
+  "Value": "0",
+  "GasLimit": 460784233,
+  "GasFeeCap": "630212788",
+  "GasPremium": "54680130",
+  "Method": 4,
+  "Params": "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"
+}`), &msg)
 		if err != nil {
 			return err
 		}
+
+		res, err := sm.CallAtStateAndVersion(ctx, &types.Message{}, migrationTs, newCid2, network.Version17)
+		fmt.Printf("%+v, %+v", res, err)
+		/*
+			if newCid1 != newCid2 {
+				return xerrors.Errorf("got different results with and without the cache: %s, %s", newCid1,
+					newCid2)
+			}
+
+			err = checkStateInvariants(ctx, blk.ParentStateRoot, newCid1, bs)
+			if err != nil {
+				return err
+			}
+		*/
 
 		return nil
 	},
