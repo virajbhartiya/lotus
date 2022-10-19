@@ -24,6 +24,7 @@ import (
 	adt9 "github.com/filecoin-project/go-state-types/builtin/v9/util/adt"
 	verifreg9 "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/filecoin-project/go-state-types/network"
+	"github.com/filecoin-project/specs-actors/v7/actors/migration/nv15"
 
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors"
@@ -154,7 +155,7 @@ var migrationsCmd = &cli.Command{
 
 		fmt.Println("new cid", newCid1)
 		*/
-		newCid2, err := filcns.UpgradeActorsV9(ctx, sm, NullMigrationCache{}, nil, blk.ParentStateRoot, blk.Height-1, migrationTs)
+		newCid2, err := filcns.UpgradeActorsV9(ctx, sm, nv15.NewMemMigrationCache(), nil, blk.ParentStateRoot, blk.Height-1, migrationTs)
 		if err != nil {
 			return err
 		}
@@ -178,7 +179,7 @@ var migrationsCmd = &cli.Command{
 			return err
 		}
 
-		res, err := sm.CallAtStateAndVersion(ctx, &types.Message{}, migrationTs, newCid2, network.Version17)
+		res, err := sm.CallAtStateAndVersion(ctx, &msg, migrationTs, newCid2, network.Version17)
 		fmt.Printf("%+v, %+v", res, err)
 		/*
 			if newCid1 != newCid2 {
