@@ -195,7 +195,7 @@ var migrationsCmd = &cli.Command{
   "From": "f3sf6gf4lcb27varcyq6jqryvs75hhbsz5gzqlsgykpftf5ce4php4hiwrkogmfz2ussy7tcauayhyiid5bxeq",
   "Nonce": 222,
   "Value": "0",
-  "GasLimit": 1000000000,
+  "GasLimit": 10000000000,
   "GasFeeCap": "630212788",
   "GasPremium": "54680130",
   "Method": 4,
