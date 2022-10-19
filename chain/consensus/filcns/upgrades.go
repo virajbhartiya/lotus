@@ -1492,8 +1492,8 @@ func upgradeActorsV9Common(
 	root cid.Cid, epoch abi.ChainEpoch, ts *types.TipSet,
 	config nv17.Config,
 ) (cid.Cid, error) {
-	buf := blockstore.NewTieredBstore(sm.ChainStore().StateBlockstore(), blockstore.NewMemorySync())
-	store := store.ActorStore(ctx, buf)
+	writeStore := blockstore.NewAutobatch(ctx, sm.ChainStore().StateBlockstore(), units.GiB/4)
+	store := store.ActorStore(ctx, writeStore)
 
 	// ensure that the manifest is loaded in the blockstore
 	if err := bundle.LoadBundles(ctx, buf, actorstypes.Version9); err != nil {
@@ -1535,17 +1535,14 @@ func upgradeActorsV9Common(
 		return cid.Undef, xerrors.Errorf("failed to persist new state root: %w", err)
 	}
 
-	// Persist the new tree.
-
-	{
-		from := buf
-		to := buf.Read()
-
-		if err := vm.Copy(ctx, from, to, newRoot); err != nil {
-			return cid.Undef, xerrors.Errorf("copying migrated tree: %w", err)
-		}
+	// Persists the new tree and shuts down the flush worker
+	if err := writeStore.Flush(ctx); err != nil {
+		return cid.Undef, xerrors.Errorf("writeStore flush failed: %w", err)
 	}
 
+	if err := writeStore.Shutdown(ctx); err != nil {
+		return cid.Undef, xerrors.Errorf("writeStore shutdown failed: %w", err)
+	}
 	return newRoot, nil
 }
 
