@@ -7,6 +7,7 @@ import (
 	"io"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/ipfs/go-cid"
 	"github.com/urfave/cli/v2"
 	cbg "github.com/whyrusleeping/cbor-gen"
@@ -24,7 +25,6 @@ import (
 	adt9 "github.com/filecoin-project/go-state-types/builtin/v9/util/adt"
 	verifreg9 "github.com/filecoin-project/go-state-types/builtin/v9/verifreg"
 	"github.com/filecoin-project/go-state-types/network"
-	"github.com/filecoin-project/specs-actors/v7/actors/migration/nv15"
 
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors"
@@ -45,19 +45,45 @@ import (
 	"github.com/filecoin-project/lotus/storage/sealer/ffiwrapper"
 )
 
-type NullMigrationCache struct{}
+type LRUMigrationCache struct {
+	cache *lru.TwoQueueCache
+}
 
-func (_ NullMigrationCache) Write(key string, value cid.Cid) error {
+func NewLRUMigrationCache(size int) *LRUMigrationCache {
+	cache, err := lru.New2Q(size)
+	if err != nil {
+		panic(err)
+	}
+
+	return &LRUMigrationCache{
+		cache: cache,
+	}
+}
+
+func (mc *LRUMigrationCache) Write(key string, value cid.Cid) error {
+	mc.cache.Add(key, value)
 	return nil
 }
-func (_ NullMigrationCache) Read(key string) (bool, cid.Cid, error) {
+func (mc *LRUMigrationCache) Read(key string) (bool, cid.Cid, error) {
+	val, ok := mc.cache.Get(key)
+	if ok {
+		return true, val.(cid.Cid), nil
+	}
 	return false, cid.Undef, nil
 }
-func (_ NullMigrationCache) Load(key string, loadFunc func() (cid.Cid, error)) (cid.Cid, error) {
+func (mc *LRUMigrationCache) Load(key string, loadFunc func() (cid.Cid, error)) (cid.Cid, error) {
+	val, ok := mc.cache.Get(key)
+	if ok {
+		return val.(cid.Cid), nil
+	}
+
 	c, err := loadFunc()
 	if err != nil {
 		return cid.Undef, err
 	}
+
+	mc.cache.Add(key, c)
+
 	return c, nil
 }
 
@@ -155,7 +181,7 @@ var migrationsCmd = &cli.Command{
 
 		fmt.Println("new cid", newCid1)
 		*/
-		newCid2, err := filcns.UpgradeActorsV9(ctx, sm, nv15.NewMemMigrationCache(), nil, blk.ParentStateRoot, blk.Height-1, migrationTs)
+		newCid2, err := filcns.UpgradeActorsV9(ctx, sm, NewLRUMigrationCache(250000), nil, blk.ParentStateRoot, blk.Height-1, migrationTs)
 		if err != nil {
 			return err
 		}
