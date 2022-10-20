@@ -1003,12 +1003,5 @@ workflows:
           name: publish-dockerhub-nightly
           tag: nightly
   biweekly:
-    triggers:
-      - schedule:
-          cron: "0 0 1,15 * *"
-          filters:
-            branches:
-              only:
-                - master
     jobs:
       - publish-packer-snap
