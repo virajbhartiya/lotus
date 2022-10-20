@@ -206,7 +206,9 @@ var migrationsCmd = &cli.Command{
 		}
 
 		res, err := sm.CallAtStateAndVersion(ctx, &msg, migrationTs, newCid2, network.Version17)
-		fmt.Printf("%+v, %+v", res, err)
+		fmt.Printf("%+v, %+v\n", res.GasCost, err)
+		printInternalExecutions("", []types.ExecutionTrace{res.ExecutionTrace})
+
 		/*
 			if newCid1 != newCid2 {
 				return xerrors.Errorf("got different results with and without the cache: %s, %s", newCid1,
@@ -221,6 +223,13 @@ var migrationsCmd = &cli.Command{
 
 		return nil
 	},
+}
+
+func printInternalExecutions(prefix string, trace []types.ExecutionTrace) {
+	for _, im := range trace {
+		fmt.Printf("%s%s\t%s\t%s\t%d\t%x\t%d\t%x\n", prefix, im.Msg.From, im.Msg.To, im.Msg.Value, im.Msg.Method, im.Msg.Params, im.MsgRct.ExitCode, im.MsgRct.Return)
+		printInternalExecutions(prefix+"\t", im.Subcalls)
+	}
 }
 
 func checkStateInvariants(ctx context.Context, v8StateRoot cid.Cid, v9StateRoot cid.Cid, bs blockstore.Blockstore) error {
