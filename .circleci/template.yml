@@ -755,7 +755,6 @@ jobs:
           at: "."
       - packer_build:
           template: tools/packer/lotus-snap.pkr.hcl
-          args: -parallel-builds=1
   publish-dockerhub:
     description: publish to dockerhub
     machine:
