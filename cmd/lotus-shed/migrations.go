@@ -28,6 +28,7 @@ import (
 	"github.com/filecoin-project/go-state-types/network"
 
 	"github.com/filecoin-project/lotus/blockstore"
+	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/actors/adt"
 	lbuiltin "github.com/filecoin-project/lotus/chain/actors/builtin"
@@ -35,6 +36,8 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/market"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/actors/builtin/verifreg"
+	"github.com/filecoin-project/lotus/chain/beacon"
+	"github.com/filecoin-project/lotus/chain/beacon/drand"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
 	"github.com/filecoin-project/lotus/chain/state"
 	"github.com/filecoin-project/lotus/chain/stmgr"
@@ -140,10 +143,19 @@ var migrationsCmd = &cli.Command{
 			return err
 		}
 
+		dc := build.DrandConfigSchedule()
+		shd := beacon.Schedule{}
+		for _, dc := range dc {
+			bc, err := drand.NewDrandBeacon(1598306400, build.BlockDelaySecs, nil, dc.Config)
+			if err != nil {
+				return xerrors.Errorf("creating drand beacon: %w", err)
+			}
+			shd = append(shd, beacon.BeaconPoint{Start: dc.Start, Beacon: bc})
+		}
 		cs := store.NewChainStore(bs, bs, mds, filcns.Weight, nil)
 		defer cs.Close() //nolint:errcheck
 
-		sm, err := stmgr.NewStateManager(cs, filcns.NewTipSetExecutor(), vm.Syscalls(ffiwrapper.ProofVerifier), filcns.DefaultUpgradeSchedule(), nil)
+		sm, err := stmgr.NewStateManager(cs, filcns.NewTipSetExecutor(), vm.Syscalls(ffiwrapper.ProofVerifier), filcns.DefaultUpgradeSchedule(), shd)
 		if err != nil {
 			return err
 		}
