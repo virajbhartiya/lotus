@@ -143,9 +143,9 @@ var migrationsCmd = &cli.Command{
 			return err
 		}
 
-		dc := build.DrandConfigSchedule()
+		dcs := build.DrandConfigSchedule()
 		shd := beacon.Schedule{}
-		for _, dc := range dc {
+		for _, dc := range dcs {
 			bc, err := drand.NewDrandBeacon(1598306400, build.BlockDelaySecs, nil, dc.Config)
 			if err != nil {
 				return xerrors.Errorf("creating drand beacon: %w", err)
