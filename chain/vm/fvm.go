@@ -40,6 +40,7 @@ import (
 var _ Interface = (*FVM)(nil)
 var _ ffi_cgo.Externs = (*FvmExtern)(nil)
 var debugBundleV8path = os.Getenv("LOTUS_FVM_DEBUG_BUNDLE_V8")
+var debugBundleV9path = os.Getenv("LOTUS_FVM_DEBUG_BUNDLE_V9")
 
 type FvmExtern struct {
 	Rand
@@ -428,6 +429,12 @@ func NewDebugFVM(ctx context.Context, opts *VMOpts) (*FVM, error) {
 		if debugBundleV8path != "" {
 			if err := createMapping(debugBundleV8path); err != nil {
 				log.Errorf("failed to create v8 debug mapping")
+			}
+		}
+	case actorstypes.Version9:
+		if debugBundleV9path != "" {
+			if err := createMapping(debugBundleV9path); err != nil {
+				log.Errorf("failed to create v9 debug mapping")
 			}
 		}
 	}
