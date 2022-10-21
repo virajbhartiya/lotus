@@ -227,7 +227,7 @@ var migrationsCmd = &cli.Command{
 
 func printInternalExecutions(prefix string, trace []types.ExecutionTrace) {
 	for _, im := range trace {
-		fmt.Printf("%s%s\t%s\t%s\t%d\t%x\t%d\t%x\n", prefix, im.Msg.From, im.Msg.To, im.Msg.Value, im.Msg.Method, im.Msg.Params, im.MsgRct.ExitCode, im.MsgRct.Return)
+		fmt.Printf("%s%s\t%s\t%s\t%d\t%d\t%x\t%d\t%x\n", prefix, im.Msg.From, im.Msg.To, im.Msg.Value, im.Msg.Method, im.MsgRct.GasUsed, im.Msg.Params, im.MsgRct.ExitCode, im.MsgRct.Return)
 		printInternalExecutions(prefix+"\t", im.Subcalls)
 	}
 }
