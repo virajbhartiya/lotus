@@ -230,7 +230,6 @@ var migrationsCmd = &cli.Command{
 			return err
 		}
 
-		migrationTs.SetHeight(2262044)
 		res, err := sm.CallAtStateAndVersion(ctx, &msg, migrationTs, newCid2, network.Version17)
 		fmt.Printf("%+v, %+v\n", res, err)
 		if err != nil {
