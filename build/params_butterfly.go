@@ -19,7 +19,7 @@ var DrandSchedule = map[abi.ChainEpoch]DrandEnum{
 	0: DrandMainnet,
 }
 
-const GenesisNetworkVersion = network.Version16
+const GenesisNetworkVersion = network.Version0
 
 var NetworkBundle = "butterflynet"
 var BundleOverrides map[actorstypes.Version]string
@@ -33,23 +33,23 @@ const UpgradeSmokeHeight = -2
 const UpgradeIgnitionHeight = -3
 const UpgradeRefuelHeight = -4
 
-var UpgradeAssemblyHeight = abi.ChainEpoch(-5)
+var UpgradeAssemblyHeight = abi.ChainEpoch(30)
 
-const UpgradeTapeHeight = -6
-const UpgradeLiftoffHeight = -7
-const UpgradeKumquatHeight = -8
-const UpgradeCalicoHeight = -9
-const UpgradePersianHeight = -10
-const UpgradeClausHeight = -11
-const UpgradeOrangeHeight = -12
-const UpgradeTrustHeight = -13
-const UpgradeNorwegianHeight = -14
-const UpgradeTurboHeight = -15
-const UpgradeHyperdriveHeight = -16
-const UpgradeChocolateHeight = -17
-const UpgradeOhSnapHeight = -18
-const UpgradeSkyrHeight = -19
-const UpgradeSharkHeight = abi.ChainEpoch(50)
+const UpgradeTapeHeight = 60
+const UpgradeLiftoffHeight = -5
+const UpgradeKumquatHeight = 90
+const UpgradeCalicoHeight = 120
+const UpgradePersianHeight = UpgradeCalicoHeight + (builtin2.EpochsInHour * 1)
+const UpgradeClausHeight = 270
+const UpgradeOrangeHeight = 300
+const UpgradeTrustHeight = 330
+const UpgradeNorwegianHeight = 360
+const UpgradeTurboHeight = 390
+const UpgradeHyperdriveHeight = 420
+const UpgradeChocolateHeight = 450
+const UpgradeOhSnapHeight = 480
+const UpgradeSkyrHeight = 510
+const UpgradeSharkHeight = abi.ChainEpoch(540)
 
 var SupportedProofTypes = []abi.RegisteredSealProof{
 	abi.RegisteredSealProof_StackedDrg512MiBV1,
