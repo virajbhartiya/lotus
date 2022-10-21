@@ -207,7 +207,10 @@ var migrationsCmd = &cli.Command{
 		}
 
 		res, err := sm.CallAtStateAndVersion(ctx, &msg, migrationTs, newCid2, network.Version17)
-		fmt.Printf("%+v, %+v\n", res.GasCost, err)
+		fmt.Printf("%+v, %+v\n", ret, err)
+		if err != nil {
+			fmt.Printf("GasUsed: %d\n", ret.GasUsed)
+		}
 		//	printInternalExecutions(0, []types.ExecutionTrace{res.ExecutionTrace})
 
 		/*
