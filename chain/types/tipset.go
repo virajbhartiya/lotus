@@ -151,6 +151,9 @@ func (ts *TipSet) Key() TipSetKey {
 func (ts *TipSet) Height() abi.ChainEpoch {
 	return ts.height
 }
+func (ts *TipSet) SetHeight(h abi.ChainEpoch) {
+	ts.height = h
+}
 
 func (ts *TipSet) Parents() TipSetKey {
 	return NewTipSetKey(ts.blks[0].Parents...)
