@@ -207,7 +207,7 @@ var migrationsCmd = &cli.Command{
 
 		res, err := sm.CallAtStateAndVersion(ctx, &msg, migrationTs, newCid2, network.Version17)
 		fmt.Printf("%+v, %+v\n", res.GasCost, err)
-		printInternalExecutions("", []types.ExecutionTrace{res.ExecutionTrace})
+		printInternalExecutions(0, []types.ExecutionTrace{res.ExecutionTrace})
 
 		/*
 			if newCid1 != newCid2 {
@@ -225,10 +225,13 @@ var migrationsCmd = &cli.Command{
 	},
 }
 
-func printInternalExecutions(prefix string, trace []types.ExecutionTrace) {
+func printInternalExecutions(depth int, trace []types.ExecutionTrace) {
+	if depth == 0 {
+		fmt.Println("depth\tFrom\tTo\tValue\tMethod\tGasUsed\tParams\tExitCode\tReturn")
+	}
 	for _, im := range trace {
-		fmt.Printf("%s%s\t%s\t%s\t%d\t%d\t%x\t%d\t%x\n", prefix, im.Msg.From, im.Msg.To, im.Msg.Value, im.Msg.Method, im.MsgRct.GasUsed, im.Msg.Params, im.MsgRct.ExitCode, im.MsgRct.Return)
-		printInternalExecutions(prefix+"\t", im.Subcalls)
+		fmt.Printf("%d\t%s\t%s\t%s\t%d\t%d\t%x\t%d\t%x\n", depth, im.Msg.From, im.Msg.To, im.Msg.Value, im.Msg.Method, im.MsgRct.GasUsed, im.Msg.Params, im.MsgRct.ExitCode, im.MsgRct.Return)
+		printInternalExecutions(depth+1, im.Subcalls)
 	}
 }
 
