@@ -208,7 +208,7 @@ var migrationsCmd = &cli.Command{
 
 		res, err := sm.CallAtStateAndVersion(ctx, &msg, migrationTs, newCid2, network.Version17)
 		fmt.Printf("%+v, %+v\n", res.GasCost, err)
-		printInternalExecutions(0, []types.ExecutionTrace{res.ExecutionTrace})
+		//	printInternalExecutions(0, []types.ExecutionTrace{res.ExecutionTrace})
 
 		/*
 			if newCid1 != newCid2 {
