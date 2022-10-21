@@ -181,8 +181,8 @@ var migrationsCmd = &cli.Command{
 
 		fmt.Println("new cid", newCid1)
 		*/
-		//newCid2, err := filcns.UpgradeActorsV9(ctx, sm, NewLRUMigrationCache(1000), nil, blk.ParentStateRoot, blk.Height-1, migrationTs)
-		newCid2, err := cid.Decode("bafy2bzaceashrj5bldj2osjkq5h6lcuzhgs77zcdixapd2gf2242httvdp7zc")
+		newCid2, err := filcns.UpgradeActorsV9(ctx, sm, NewLRUMigrationCache(1000), nil, blk.ParentStateRoot, blk.Height-1, migrationTs)
+		//	newCid2, err := cid.Decode("bafy2bzaceashrj5bldj2osjkq5h6lcuzhgs77zcdixapd2gf2242httvdp7zc")
 		if err != nil {
 			return err
 		}
