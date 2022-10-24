@@ -32,45 +32,27 @@ const GenesisFile = "calibnet.car"
 
 const UpgradeBreezeHeight = -1
 const BreezeGasTampingDuration = 120
-
 const UpgradeSmokeHeight = -2
-
 const UpgradeIgnitionHeight = -3
 const UpgradeRefuelHeight = -4
 
 var UpgradeAssemblyHeight = abi.ChainEpoch(30)
 
 const UpgradeTapeHeight = 60
-
 const UpgradeLiftoffHeight = -5
-
 const UpgradeKumquatHeight = 90
-
 const UpgradeCalicoHeight = 120
 const UpgradePersianHeight = UpgradeCalicoHeight + (builtin2.EpochsInHour * 1)
-
 const UpgradeClausHeight = 270
-
 const UpgradeOrangeHeight = 300
-
 const UpgradeTrustHeight = 330
-
 const UpgradeNorwegianHeight = 360
-
 const UpgradeTurboHeight = 390
-
 const UpgradeHyperdriveHeight = 420
-
-const UpgradeChocolateHeight = 312746
-
-// 2022-02-10T19:23:00Z
-const UpgradeOhSnapHeight = 682006
-
-// 2022-06-16T17:30:00Z
-const UpgradeSkyrHeight = 1044660
-
-// 2022-10-20T16:00:07Z
-const UpgradeSharkHeight = 1407374
+const UpgradeChocolateHeight = 450
+const UpgradeOhSnapHeight = 480
+const UpgradeSkyrHeight = 510
+const UpgradeSharkHeight = 540
 
 var SupportedProofTypes = []abi.RegisteredSealProof{
 	abi.RegisteredSealProof_StackedDrg32GiBV1,
