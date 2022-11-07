@@ -1089,6 +1089,7 @@ workflows:
           filters:
             branches:
               only:
+                - refactor-release-pipeline-test
                 - /^release\/v\d+\.\d+\.\d+(-rc\d+)?$/
             tags:
               only:
@@ -1098,6 +1099,7 @@ workflows:
           filters:
             branches:
               only:
+                - refactor-release-pipeline-test
                 - /^release\/v\d+\.\d+\.\d+(-rc\d+)?$/
             tags:
               only:
@@ -1107,6 +1109,7 @@ workflows:
           filters:
             branches:
               only:
+                - refactor-release-pipeline-test
                 - /^release\/v\d+\.\d+\.\d+(-rc\d+)?$/
             tags:
               only:
@@ -1134,6 +1137,7 @@ workflows:
           filters:
             branches:
               only:
+                - refactor-release-pipeline-test
                 - /^release\/v\d+\.\d+\.\d+(-rc\d+)?$/
       - build-appimage:
           name: "Build AppImage"
