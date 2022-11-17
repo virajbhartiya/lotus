@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"golang.org/x/xerrors"
@@ -466,6 +467,11 @@ func (r *Remote) readRemote(ctx context.Context, url string, offset, size abi.Pa
 		resp.Body.Close() // nolint
 		return nil, xerrors.Errorf("non-200 code: %d", resp.StatusCode)
 	}
+
+	go func() {
+		time.Sleep(10 * time.Second)
+		resp.Body.Close() // nolint
+	}()
 
 	return resp.Body, nil
 }
