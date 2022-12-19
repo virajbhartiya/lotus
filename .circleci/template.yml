@@ -481,7 +481,7 @@ jobs:
             golangci-lint run -v --timeout 10m \
               --concurrency 4 << parameters.args >>
 
-  publish:
+  publish: 
     description: publish binary artifacts
     executor: ubuntu
     parameters:
