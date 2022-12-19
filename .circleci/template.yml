@@ -602,7 +602,7 @@ jobs:
                         if [["[[ ! -z $CIRCLE_TAG ]]"]]; then
                           docker image tag filecoin/<<parameters.image>>:<<parameters.channel>> filecoin/<<parameters.image>>:"${CIRCLE_TAG}"
                           echo docker push filecoin/<<parameters.image>>:"${CIRCLE_TAG}"
-                          if [["[[ <<parameters.channel>> == 'stable' ]]"]]; then
+                          if [["[[ '<<parameters.channel>>' == 'stable' ]]"]]; then
                             docker image tag filecoin/<<parameters.image>>:stable filecoin/<<parameters.image>>:lastest
                             echo docker push filecoin/<<parameters.image>>:latest
                           fi
@@ -636,7 +636,7 @@ jobs:
                         if [["[[ ! -z $CIRCLE_TAG ]]"]]; then
                           docker image tag filecoin/<<parameters.image>>:<<parameters.channel>>-<<parameters.network>> filecoin/<<parameters.image>>:"${CIRCLE_TAG}"-<<parameters.network>>
                           echo docker push filecoin/<<parameters.image>>:"${CIRCLE_TAG}"-<<parameters.network>>
-                          if [["[[ <<parameters.channel>> == 'stable' ]]"]]; then
+                          if [["[[ '<<parameters.channel>>' == 'stable' ]]"]]; then
                             docker image tag filecoin/<<parameters.image>>:stable filecoin/<<parameters.image>>:lastest
                             echo docker push filecoin/<<parameters.image>>:latest
                           fi
