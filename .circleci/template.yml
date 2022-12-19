@@ -12,7 +12,7 @@ executors:
   ubuntu:
     docker:
       - image: ubuntu:20.04
-
+ 
 commands:
   prepare:
     parameters:
