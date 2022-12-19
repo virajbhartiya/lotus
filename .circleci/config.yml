@@ -594,17 +594,17 @@ jobs:
                   - run:
                       name: Docker push
                       command: |
-                        docker push filecoin/<<parameters.image>>:<<parameters.channel>>
+                        echo docker push filecoin/<<parameters.image>>:<<parameters.channel>>
                         if [[ ! -z $CIRCLE_SHA ]]; then
                           docker image tag filecoin/<<parameters.image>>:<<parameters.channel>>> filecoin/<<parameters.image>>:"${CIRCLE_SHA:0:7}"
-                          docker push filecoin/<<parameters.image>>:"${CIRCLE_SHA:0:7}"
+                          echo docker push filecoin/<<parameters.image>>:"${CIRCLE_SHA:0:7}"
                         fi
                         if [[ ! -z $CIRCLE_TAG ]]; then
                           docker image tag filecoin/<<parameters.image>>:<<parameters.channel>> filecoin/<<parameters.image>>:"${CIRCLE_TAG}"
-                          docker push filecoin/<<parameters.image>>:"${CIRCLE_TAG}"
+                          echo docker push filecoin/<<parameters.image>>:"${CIRCLE_TAG}"
                           if [[ <<parameters.channel>> == 'stable' ]]; then
                             docker image tag filecoin/<<parameters.image>>:stable filecoin/<<parameters.image>>:lastest
-                            docker push filecoin/<<parameters.image>>:latest
+                            echo docker push filecoin/<<parameters.image>>:latest
                           fi
                         fi
             - unless:
@@ -628,17 +628,17 @@ jobs:
                   - run:
                       name: Docker push
                       command: |
-                        docker push filecoin/<<parameters.image>>:<<parameters.channel>>-<<parameters.network>>
+                        echo docker push filecoin/<<parameters.image>>:<<parameters.channel>>-<<parameters.network>>
                         if [[ ! -z $CIRCLE_SHA ]]; then
                           docker image tag filecoin/<<parameters.image>>:<<parameters.channel>>-<<parameters.network>> filecoin/<<parameters.image>>:"${CIRCLE_SHA:0:7}"-<<parameters.network>>
-                          docker push filecoin/<<parameters.image>>:"${CIRCLE_SHA:0:7}"-<<parameters.network>>
+                          echo docker push filecoin/<<parameters.image>>:"${CIRCLE_SHA:0:7}"-<<parameters.network>>
                         fi
                         if [[ ! -z $CIRCLE_TAG ]]; then
                           docker image tag filecoin/<<parameters.image>>:<<parameters.channel>>-<<parameters.network>> filecoin/<<parameters.image>>:"${CIRCLE_TAG}"-<<parameters.network>>
-                          docker push filecoin/<<parameters.image>>:"${CIRCLE_TAG}"-<<parameters.network>>
+                          echo docker push filecoin/<<parameters.image>>:"${CIRCLE_TAG}"-<<parameters.network>>
                           if [[ <<parameters.channel>> == 'stable' ]]; then
                             docker image tag filecoin/<<parameters.image>>:stable filecoin/<<parameters.image>>:lastest
-                            docker push filecoin/<<parameters.image>>:latest
+                            echo docker push filecoin/<<parameters.image>>:latest
                           fi
                         fi
             - unless:
@@ -1138,8 +1138,8 @@ workflows:
           push: true
           filters:
             branches:
-              ignore:
-                - /.*/
+              only:
+                - id/add-lastest-docker-tag
             tags:
               only:
                 - /^v\d+\.\d+\.\d+$/
@@ -1151,8 +1151,8 @@ workflows:
           push: true
           filters:
             branches:
-              ignore:
-                - /.*/
+              only:
+                - id/add-lastest-docker-tag
             tags:
               only:
                 - /^v\d+\.\d+\.\d+-rc\d+$/
@@ -1166,6 +1166,7 @@ workflows:
             branches:
               only:
                 - master
+                - id/add-lastest-docker-tag
       - build-docker:
           name: "Docker build (lotus-all-in-one / mainnet)"
           image: lotus-all-in-one
@@ -1175,6 +1176,7 @@ workflows:
             branches:
               only:
                 - /^release\/v\d+\.\d+\.\d+(-rc\d+)?$/
+                - id/add-lastest-docker-tag
       - build-docker:
           name: "Docker push (lotus-all-in-one / stable / butterflynet)"
           image: lotus-all-in-one
@@ -1183,8 +1185,8 @@ workflows:
           push: true
           filters:
             branches:
-              ignore:
-                - /.*/
+              only:
+                - id/add-lastest-docker-tag
             tags:
               only:
                 - /^v\d+\.\d+\.\d+$/
@@ -1196,8 +1198,8 @@ workflows:
           push: true
           filters:
             branches:
-              ignore:
-                - /.*/
+              only:
+                - id/add-lastest-docker-tag
             tags:
               only:
                 - /^v\d+\.\d+\.\d+-rc\d+$/
@@ -1211,6 +1213,7 @@ workflows:
             branches:
               only:
                 - master
+                - id/add-lastest-docker-tag
       - build-docker:
           name: "Docker build (lotus-all-in-one / butterflynet)"
           image: lotus-all-in-one
@@ -1220,6 +1223,7 @@ workflows:
             branches:
               only:
                 - /^release\/v\d+\.\d+\.\d+(-rc\d+)?$/
+                - id/add-lastest-docker-tag
       - build-docker:
           name: "Docker push (lotus-all-in-one / stable / calibnet)"
           image: lotus-all-in-one
@@ -1228,8 +1232,8 @@ workflows:
           push: true
           filters:
             branches:
-              ignore:
-                - /.*/
+              only:
+                - id/add-lastest-docker-tag
             tags:
               only:
                 - /^v\d+\.\d+\.\d+$/
@@ -1241,8 +1245,8 @@ workflows:
           push: true
           filters:
             branches:
-              ignore:
-                - /.*/
+              only:
+                - id/add-lastest-docker-tag
             tags:
               only:
                 - /^v\d+\.\d+\.\d+-rc\d+$/
@@ -1256,6 +1260,7 @@ workflows:
             branches:
               only:
                 - master
+                - id/add-lastest-docker-tag
       - build-docker:
           name: "Docker build (lotus-all-in-one / calibnet)"
           image: lotus-all-in-one
@@ -1265,6 +1270,7 @@ workflows:
             branches:
               only:
                 - /^release\/v\d+\.\d+\.\d+(-rc\d+)?$/
+                - id/add-lastest-docker-tag
       - build-docker:
           name: "Docker push (lotus-all-in-one / stable / debug)"
           image: lotus-all-in-one
@@ -1273,8 +1279,8 @@ workflows:
           push: true
           filters:
             branches:
-              ignore:
-                - /.*/
+              only:
+                - id/add-lastest-docker-tag
             tags:
               only:
                 - /^v\d+\.\d+\.\d+$/
@@ -1286,8 +1292,8 @@ workflows:
           push: true
           filters:
             branches:
-              ignore:
-                - /.*/
+              only:
+                - id/add-lastest-docker-tag
             tags:
               only:
                 - /^v\d+\.\d+\.\d+-rc\d+$/
@@ -1301,6 +1307,7 @@ workflows:
             branches:
               only:
                 - master
+                - id/add-lastest-docker-tag
       - build-docker:
           name: "Docker build (lotus-all-in-one / debug)"
           image: lotus-all-in-one
@@ -1310,6 +1317,7 @@ workflows:
             branches:
               only:
                 - /^release\/v\d+\.\d+\.\d+(-rc\d+)?$/
+                - id/add-lastest-docker-tag
       - build-docker:
           name: "Docker push (lotus / stable / mainnet)"
           image: lotus
@@ -1318,8 +1326,8 @@ workflows:
           push: true
           filters:
             branches:
-              ignore:
-                - /.*/
+              only:
+                - id/add-lastest-docker-tag
             tags:
               only:
                 - /^v\d+\.\d+\.\d+$/
@@ -1331,8 +1339,8 @@ workflows:
           push: true
           filters:
             branches:
-              ignore:
-                - /.*/
+              only:
+                - id/add-lastest-docker-tag
             tags:
               only:
                 - /^v\d+\.\d+\.\d+-rc\d+$/
@@ -1345,6 +1353,7 @@ workflows:
           filters:
             branches:
               only:
+                - id/add-lastest-docker-tag
                 - master
       - build-docker:
           name: "Docker build (lotus / mainnet)"
@@ -1354,6 +1363,7 @@ workflows:
           filters:
             branches:
               only:
+                - id/add-lastest-docker-tag
                 - /^release\/v\d+\.\d+\.\d+(-rc\d+)?$/
 
   nightly:
