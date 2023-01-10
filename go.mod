@@ -37,7 +37,7 @@ require (
 	github.com/filecoin-project/go-data-transfer v1.15.2
 	github.com/filecoin-project/go-fil-commcid v0.1.0
 	github.com/filecoin-project/go-fil-commp-hashhash v0.1.0
-	github.com/filecoin-project/go-fil-markets v1.25.2
+	github.com/filecoin-project/go-fil-markets v1.26.0
 	github.com/filecoin-project/go-jsonrpc v0.1.8
 	github.com/filecoin-project/go-legs v0.4.4
 	github.com/filecoin-project/go-padreader v0.0.1
@@ -231,6 +231,8 @@ require (
 	github.com/ipfs/go-peertaskqueue v0.8.0 // indirect
 	github.com/ipfs/go-verifcid v0.0.2 // indirect
 	github.com/ipld/go-ipld-adl-hamt v0.0.0-20220616142416-9004dbd839e0 // indirect
+	github.com/ipni/index-provider v0.10.0 // indirect
+	github.com/ipni/storetheindex v0.5.3-0.20221203123030-16745cb63f15 // indirect
 	github.com/ipsn/go-secp256k1 v0.0.0-20180726113642-9d62b9f0bc52 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-random v0.0.0-20190219211222-123a90aedc0c // indirect
