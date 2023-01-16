@@ -106,7 +106,7 @@ var benchStateUpdateCmd = &cli.Command{
 			return xerrors.Errorf("getting code cid")
 		}
 		startExp := math.Log10(float64(cctx.Uint64("scan-start")))
-		endExp := math.Log10(float64(cctx.Uint64("scan-end")))
+		endExp := math.Log10(float64(cctx.Uint64("scan-end") + 1))
 		steps := float64(cctx.Uint64("scan-steps"))
 
 		if cctx.Bool("header") {
