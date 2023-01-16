@@ -56,6 +56,10 @@ var benchStateUpdateCmd = &cli.Command{
 			Name:  "samples",
 			Value: 1,
 		},
+		&cli.BoolFlag{
+			Name:  "header",
+			Value: true,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := cliutil.ReqContext(cctx)
@@ -104,6 +108,10 @@ var benchStateUpdateCmd = &cli.Command{
 		startExp := math.Log10(float64(cctx.Uint64("scan-start")))
 		endExp := math.Log10(float64(cctx.Uint64("scan-end")))
 		steps := float64(cctx.Uint64("scan-steps"))
+
+		if cctx.Bool("header") {
+			fmt.Println("BatchSize, GetsNo, PutsNo, PutsBytes")
+		}
 
 		for e := startExp; e <= endExp; e += (endExp - startExp) / steps {
 			n := int(math.Pow(10, e))
