@@ -121,6 +121,9 @@ var benchStateUpdateCmd = &cli.Command{
 					return xerrors.Errorf("loading state tree")
 				}
 				for j := 0; j < n; j++ {
+					if ctx.Err() != nil {
+						return ctx.Err()
+					}
 					addr, err := address.NewIDAddress((rand.Uint64() % maxId) + 1) // not perfect distribution but good enough
 					if err != nil {
 						return xerrors.Errorf("creating ID address %d: %w", maxId, err)
