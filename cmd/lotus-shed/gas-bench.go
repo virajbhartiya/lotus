@@ -138,6 +138,9 @@ var benchStateUpdateCmd = &cli.Command{
 					log.Warnf("error while flushing actor: %+v", err)
 				}
 				fmt.Printf("%d, %d, %d, %d\n", n, bs.getsNo, bs.putsNo, bs.putsBytes)
+				bs.getsNo = 0
+				bs.putsNo = 0
+				bs.putsBytes = 0
 			}
 		}
 
