@@ -6,7 +6,9 @@ import (
 	"io"
 
 	"github.com/filecoin-project/go-address"
+	actorstypes "github.com/filecoin-project/go-state-types/actors"
 	"github.com/filecoin-project/lotus/blockstore"
+	"github.com/filecoin-project/lotus/chain/actors"
 	"github.com/filecoin-project/lotus/chain/state"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
@@ -82,12 +84,18 @@ var benchStateUpdateCmd = &cli.Command{
 
 		cst := cbor.NewCborStore(bs)
 		stateTree, err := state.LoadStateTree(cst, stateCid)
+		if err != nil {
+			return xerrors.Errorf("loading state tree")
+		}
 		addr, err := address.NewIDAddress(maxId)
 		if err != nil {
 			return xerrors.Errorf("creating ID address %d: %w", maxId, err)
 		}
-
-		err = stateTree.SetActor(addr, &types.Actor{Nonce: 1 << 62}) // nonce that high is guarnateed to not exist
+		codeCid, ok := actors.GetActorCodeID(actorstypes.Version8, "account")
+		if !ok {
+			return xerrors.Errorf("getting code cid")
+		}
+		err = stateTree.SetActor(addr, &types.Actor{Code: codeCid, Nonce: 1 << 62}) // nonce that high is guarnateed to not exist
 		if err != nil {
 			log.Warnf("error while setting actor: %+v", err)
 		}
@@ -95,7 +103,7 @@ var benchStateUpdateCmd = &cli.Command{
 		if err != nil {
 			log.Warnf("error while flushing actor: %+v", err)
 		}
-		fmt.Println("%+v\n", bs)
+		fmt.Printf("%+v\n", bs)
 
 		return nil
 	},
@@ -117,9 +125,9 @@ func (b *countingBlockstore) Get(ctx context.Context, c cid.Cid) (blocks.Block, 
 	b.getsNo++
 	return b.Blockstore.Get(ctx, c)
 }
-func (b *countingBlockstore) View(ctx context.Context, cid cid.Cid, callback func([]byte) error) error {
+func (b *countingBlockstore) View(ctx context.Context, c cid.Cid, callback func([]byte) error) error {
 	b.getsNo++
-	return b.Blockstore.View(ctx, cid, callback)
+	return b.Blockstore.View(ctx, c, callback)
 }
 
 func (b *countingBlockstore) Put(ctx context.Context, blk blocks.Block) error {
