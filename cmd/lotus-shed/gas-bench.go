@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"math"
+	"math/rand"
 
 	"github.com/filecoin-project/go-address"
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
@@ -36,7 +38,19 @@ var benchStateUpdateCmd = &cli.Command{
 		},
 		&cli.Uint64Flag{
 			Name:  "max-id",
-			Value: 1700000,
+			Value: 1992000,
+		},
+		&cli.Uint64Flag{
+			Name:  "scan-start",
+			Value: 100,
+		},
+		&cli.Uint64Flag{
+			Name:  "scan-end",
+			Value: 40000,
+		},
+		&cli.Uint64Flag{
+			Name:  "scan-steps",
+			Value: 20,
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -64,46 +78,53 @@ var benchStateUpdateCmd = &cli.Command{
 
 		defer lkrepo.Close() //nolint:errcheck
 
-		bs, err := lkrepo.Blockstore(ctx, repo.UniversalBlockstore)
-		bs = &countingBlockstore{Blockstore: bs}
+		bsOrg, err := lkrepo.Blockstore(ctx, repo.UniversalBlockstore)
 		if err != nil {
 			return fmt.Errorf("failed to open blockstore: %w", err)
 		}
 
 		defer func() {
-			if c, ok := bs.(io.Closer); ok {
+			if c, ok := bsOrg.(io.Closer); ok {
 				if err := c.Close(); err != nil {
 					log.Warnf("failed to close blockstore: %s", err)
 				}
 			}
 		}()
-		//mds, err := lkrepo.Datastore(context.Background(), "/metadata")
-		//if err != nil {
-		//return err
-		//}
 
+		bs := &countingBlockstore{Blockstore: bsOrg}
 		cst := cbor.NewCborStore(bs)
 		stateTree, err := state.LoadStateTree(cst, stateCid)
 		if err != nil {
 			return xerrors.Errorf("loading state tree")
 		}
-		addr, err := address.NewIDAddress(maxId)
-		if err != nil {
-			return xerrors.Errorf("creating ID address %d: %w", maxId, err)
-		}
 		codeCid, ok := actors.GetActorCodeID(actorstypes.Version8, "account")
 		if !ok {
 			return xerrors.Errorf("getting code cid")
 		}
-		err = stateTree.SetActor(addr, &types.Actor{Code: codeCid, Head: codeCid, Nonce: 1 << 62}) // nonce that high is guarnateed to not exist
-		if err != nil {
-			log.Warnf("error while setting actor: %+v", err)
+		startExp := math.Log10(float64(cctx.Uint64("scan-start")))
+		endExp := math.Log10(float64(cctx.Uint64("scan-end")))
+		steps := float64(cctx.Uint64("scan-steps"))
+
+		for e := startExp; e <= endExp; e += (endExp - startExp) / steps {
+			n := int(math.Pow(10, e))
+			for i := 0; i < 10; i++ {
+				for j := 0; j < n; j++ {
+					addr, err := address.NewIDAddress((rand.Uint64() % maxId) + 1) // not perfect distribution but good enough
+					if err != nil {
+						return xerrors.Errorf("creating ID address %d: %w", maxId, err)
+					}
+					err = stateTree.SetActor(addr, &types.Actor{Code: codeCid, Head: codeCid, Nonce: 1 << 62}) // nonce that high is guarnateed to not exist
+					if err != nil {
+						log.Warnf("error while setting actor: %+v", err)
+					}
+				}
+			}
+			_, err = stateTree.Flush(ctx)
+			if err != nil {
+				log.Warnf("error while flushing actor: %+v", err)
+			}
+			fmt.Printf("%d, %d, %d, %d\n", n, bs.getsNo, bs.putsNo, bs.putsBytes)
 		}
-		_, err = stateTree.Flush(ctx)
-		if err != nil {
-			log.Warnf("error while flushing actor: %+v", err)
-		}
-		fmt.Printf("%+v\n", bs)
 
 		return nil
 	},
