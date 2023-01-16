@@ -52,6 +52,10 @@ var benchStateUpdateCmd = &cli.Command{
 			Name:  "scan-steps",
 			Value: 20,
 		},
+		&cli.IntFlag{
+			Name:  "samples",
+			Value: 1,
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		ctx := cliutil.ReqContext(cctx)
@@ -93,10 +97,6 @@ var benchStateUpdateCmd = &cli.Command{
 
 		bs := &countingBlockstore{Blockstore: bsOrg}
 		cst := cbor.NewCborStore(bs)
-		stateTree, err := state.LoadStateTree(cst, stateCid)
-		if err != nil {
-			return xerrors.Errorf("loading state tree")
-		}
 		codeCid, ok := actors.GetActorCodeID(actorstypes.Version8, "account")
 		if !ok {
 			return xerrors.Errorf("getting code cid")
@@ -107,7 +107,11 @@ var benchStateUpdateCmd = &cli.Command{
 
 		for e := startExp; e <= endExp; e += (endExp - startExp) / steps {
 			n := int(math.Pow(10, e))
-			for i := 0; i < 10; i++ {
+			for i := 0; i < cctx.Int("samples"); i++ {
+				stateTree, err := state.LoadStateTree(cst, stateCid)
+				if err != nil {
+					return xerrors.Errorf("loading state tree")
+				}
 				for j := 0; j < n; j++ {
 					addr, err := address.NewIDAddress((rand.Uint64() % maxId) + 1) // not perfect distribution but good enough
 					if err != nil {
@@ -118,12 +122,12 @@ var benchStateUpdateCmd = &cli.Command{
 						log.Warnf("error while setting actor: %+v", err)
 					}
 				}
+				_, err = stateTree.Flush(ctx)
+				if err != nil {
+					log.Warnf("error while flushing actor: %+v", err)
+				}
+				fmt.Printf("%d, %d, %d, %d\n", n, bs.getsNo, bs.putsNo, bs.putsBytes)
 			}
-			_, err = stateTree.Flush(ctx)
-			if err != nil {
-				log.Warnf("error while flushing actor: %+v", err)
-			}
-			fmt.Printf("%d, %d, %d, %d\n", n, bs.getsNo, bs.putsNo, bs.putsBytes)
 		}
 
 		return nil
