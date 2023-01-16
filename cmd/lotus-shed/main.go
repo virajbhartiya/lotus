@@ -45,6 +45,7 @@ func main() {
 		mpoolCmd,
 		helloCmd,
 		genesisVerifyCmd,
+		gasBenchCmd,
 		mathCmd,
 		minerCmd,
 		mpoolStatsCmd,
