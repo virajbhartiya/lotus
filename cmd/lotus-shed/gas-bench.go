@@ -106,7 +106,7 @@ var benchStateUpdateCmd = &cli.Command{
 			return xerrors.Errorf("getting code cid")
 		}
 		startExp := math.Log10(float64(cctx.Uint64("scan-start")))
-		endExp := math.Log10(float64(cctx.Uint64("scan-end") + 1))
+		endExp := math.Log10(float64(cctx.Uint64("scan-end")))
 		steps := float64(cctx.Uint64("scan-steps"))
 
 		if cctx.Bool("header") {
@@ -114,7 +114,7 @@ var benchStateUpdateCmd = &cli.Command{
 		}
 
 		for e := startExp; e < endExp; e += (endExp - startExp) / steps {
-			n := math.Round(math.Pow(10, e))
+			n := int(math.Round(math.Pow(10, e)))
 			for i := 0; i < cctx.Int("samples"); i++ {
 				stateTree, err := state.LoadStateTree(cst, stateCid)
 				if err != nil {
