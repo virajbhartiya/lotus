@@ -114,7 +114,7 @@ var benchStateUpdateCmd = &cli.Command{
 		}
 
 		for e := startExp; e < endExp; e += (endExp - startExp) / steps {
-			n := int(math.Pow(10, e))
+			n := math.Round(math.Pow(10, e))
 			for i := 0; i < cctx.Int("samples"); i++ {
 				stateTree, err := state.LoadStateTree(cst, stateCid)
 				if err != nil {
