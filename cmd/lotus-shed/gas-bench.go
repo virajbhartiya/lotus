@@ -113,7 +113,7 @@ var benchStateUpdateCmd = &cli.Command{
 			fmt.Println("BatchSize, GetsNo, PutsNo, PutsBytes")
 		}
 
-		for e := startExp; e <= endExp; e += (endExp - startExp) / steps {
+		for e := startExp; e < endExp; e += (endExp - startExp) / steps {
 			n := int(math.Pow(10, e))
 			for i := 0; i < cctx.Int("samples"); i++ {
 				stateTree, err := state.LoadStateTree(cst, stateCid)
