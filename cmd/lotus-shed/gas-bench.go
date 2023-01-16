@@ -95,7 +95,7 @@ var benchStateUpdateCmd = &cli.Command{
 		if !ok {
 			return xerrors.Errorf("getting code cid")
 		}
-		err = stateTree.SetActor(addr, &types.Actor{Code: codeCid, Nonce: 1 << 62}) // nonce that high is guarnateed to not exist
+		err = stateTree.SetActor(addr, &types.Actor{Code: codeCid, Head: codeCid, Nonce: 1 << 62}) // nonce that high is guarnateed to not exist
 		if err != nil {
 			log.Warnf("error while setting actor: %+v", err)
 		}
