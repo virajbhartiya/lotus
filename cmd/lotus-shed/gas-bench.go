@@ -110,7 +110,7 @@ var benchStateUpdateCmd = &cli.Command{
 		steps := float64(cctx.Uint64("scan-steps"))
 
 		if cctx.Bool("header") {
-			fmt.Println("BatchSize, GetsNo, PutsNo, PutsBytes")
+			fmt.Println("BatchSize,GetsNo,PutsNo,PutsBytes")
 		}
 
 		for e := startExp; e < endExp; e += (endExp - startExp) / steps {
