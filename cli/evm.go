@@ -323,16 +323,13 @@ var EvmDeployCmd = &cli.Command{
 }
 
 var EvmInvokeCmd = &cli.Command{
-	Name:      "invoke",
-	Usage:     "Invoke an EVM smart contract using the specified CALLDATA",
-	ArgsUsage: "address calldata",
+	Name:      "invoke-evm-actor",
+	Usage:     "Invoke a contract entry point in an EVM actor",
+	ArgsUsage: "address contract-entry-point [input-data]",
 	Flags: []cli.Flag{
 		&cli.StringFlag{
 			Name:  "from",
 			Usage: "optionally specify the account to use for sending the exec message",
-		}, &cli.IntFlag{
-			Name:  "value",
-			Usage: "optionally specify the value to be sent with the invokation message",
 		},
 	},
 	Action: func(cctx *cli.Context) error {
@@ -354,17 +351,27 @@ var EvmInvokeCmd = &cli.Command{
 			return xerrors.Errorf("failed to decode address: %w", err)
 		}
 
-		var calldata []byte
-		calldata, err = hex.DecodeString(cctx.Args().Get(2))
+		entryPoint, err := hex.DecodeString(cctx.Args().Get(1))
 		if err != nil {
-			return xerrors.Errorf("decoding hex input data: %w", err)
+			return xerrors.Errorf("failed to decode hex entry point: %w", err)
 		}
 
+		var inputData []byte
+		if cctx.Args().Len() == 3 {
+			inputData, err = hex.DecodeString(cctx.Args().Get(2))
+			if err != nil {
+				return xerrors.Errorf("decoding hex input data: %w", err)
+			}
+		}
+
+		// TODO need to encode as CBOR bytes now
+		params := append(entryPoint, inputData...)
+
 		var buffer bytes.Buffer
-		if err := cbg.WriteByteArray(&buffer, calldata); err != nil {
+		if err := cbg.WriteByteArray(&buffer, params); err != nil {
 			return xerrors.Errorf("failed to encode evm params as cbor: %w", err)
 		}
-		calldata = buffer.Bytes()
+		params = buffer.Bytes()
 
 		var fromAddr address.Address
 		if from := cctx.String("from"); from == "" {
@@ -383,13 +390,12 @@ var EvmInvokeCmd = &cli.Command{
 			fromAddr = addr
 		}
 
-		val := abi.NewTokenAmount(cctx.Int64("value"))
 		msg := &types.Message{
 			To:     addr,
 			From:   fromAddr,
-			Value:  val,
+			Value:  big.Zero(),
 			Method: abi.MethodNum(2),
-			Params: calldata,
+			Params: params,
 		}
 
 		afmt.Println("sending message...")
@@ -425,7 +431,7 @@ var EvmInvokeCmd = &cli.Command{
 			afmt.Println("Events emitted:")
 
 			s := &apiIpldStore{ctx, api}
-			amt, err := amt4.LoadAMT(ctx, s, *eventsRoot, amt4.UseTreeBitWidth(types.EventAMTBitwidth))
+			amt, err := amt4.LoadAMT(ctx, s, *eventsRoot, amt4.UseTreeBitWidth(5))
 			if err != nil {
 				return err
 			}
@@ -434,9 +440,6 @@ var EvmInvokeCmd = &cli.Command{
 			err = amt.ForEach(ctx, func(u uint64, deferred *cbg.Deferred) error {
 				fmt.Printf("%x\n", deferred.Raw)
 				if err := evt.UnmarshalCBOR(bytes.NewReader(deferred.Raw)); err != nil {
-					return err
-				}
-				if err != nil {
 					return err
 				}
 				fmt.Printf("\tEmitter ID: %s\n", evt.Emitter)
