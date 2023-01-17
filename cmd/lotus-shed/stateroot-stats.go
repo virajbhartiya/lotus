@@ -273,11 +273,13 @@ var addressDepthStats = &cli.Command{
 		addressesResolved := 0
 
 		printStat := func() {
-			avgDepth := store.blocksRead / addressesResolved
-			avgData := store.dataRead / addressesResolved
+			avgDepth := float64(store.blocksRead) / float64(addressesResolved)
+			avgData := float64(store.dataRead) / float64(addressesResolved)
 
+			fmt.Println("addresses: ", addressesResolved)
 			fmt.Println("depth: ", avgDepth)
 			fmt.Println("data: ", avgData)
+			fmt.Println()
 		}
 
 		for _, actor := range actors {
@@ -299,7 +301,7 @@ var addressDepthStats = &cli.Command{
 			if err != nil {
 				return err
 			}
-			if addressesResolved%100 == 0 {
+			if addressesResolved%1000 == 0 {
 				printStat()
 			}
 		}
