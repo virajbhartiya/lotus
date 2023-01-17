@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"sort"
 
@@ -11,8 +13,13 @@ import (
 	"github.com/filecoin-project/go-address"
 
 	"github.com/filecoin-project/lotus/api"
+	"github.com/filecoin-project/lotus/chain/actors/builtin"
+	"github.com/filecoin-project/lotus/chain/actors/builtin/account"
+	init_ "github.com/filecoin-project/lotus/chain/actors/builtin/init"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
+	"github.com/filecoin-project/lotus/tools/stats/ipldstore"
+	cbg "github.com/whyrusleeping/cbor-gen"
 )
 
 var staterootCmd = &cli.Command{
@@ -199,6 +206,101 @@ var staterootStatCmd = &cli.Command{
 
 			fmt.Printf("%s\t%s\t%d\n", inf.Addr, string(cmh.Digest), inf.Stat.Size)
 		}
+		return nil
+	},
+}
+
+type apiIpldStoreApi interface {
+	ChainReadObj(context.Context, cid.Cid) ([]byte, error)
+}
+
+type trackingApiStore struct {
+	ctx context.Context
+	api apiIpldStoreApi
+
+	blocksRead, dataRead int
+}
+
+func (ts *trackingApiStore) Context() context.Context {
+	return ts.ctx
+}
+
+func (ts *trackingApiStore) Get(ctx context.Context, c cid.Cid, out interface{}) error {
+	obj, err := ts.api.ChainReadObj(ctx, c)
+	if err != nil {
+		return err
+	}
+
+	ts.blocksRead += 1
+	ts.dataRead += len(obj)
+
+	if err := out.(cbg.CBORUnmarshaler).UnmarshalCBOR(bytes.NewReader(obj)); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (ts *trackingApiStore) Put(ctx context.Context, v interface{}) (cid.Cid, error) {
+	return cid.Undef, fmt.Errorf("Put is not implemented")
+}
+
+var addressDepthStats = &cli.Command{
+	Name:        "init-stat",
+	Description: "Walk down the chain and collect stats-obj changes between tipsets",
+	Action: func(cctx *cli.Context) error {
+		api, closer, err := lcli.GetFullNodeAPI(cctx)
+		if err != nil {
+			return err
+		}
+
+		defer closer()
+		ctx := lcli.ReqContext(cctx)
+
+		head, err := api.ChainHead(ctx)
+		if err != nil {
+			return err
+		}
+		tsk := head.Key()
+
+		actors, err := api.StateListActors(ctx, tsk)
+		if err != nil {
+			return err
+		}
+		initActor, err := api.StateGetActor(ctx, init_.Address, tsk)
+		if err != nil {
+			return err
+		}
+
+		store := &trackingApiStore{ctx: ctx, api: api}
+		addressesResolved := 0
+
+		for _, actor := range actors {
+			addr, err := api.StateAccountKey(ctx, actor, tsk)
+			if err != nil {
+				continue
+			}
+			switch addr.Protocol() {
+			case address.BLS, address.SECP256K1:
+			default:
+				continue
+			}
+			initState, err := init_.Load(store, initActor)
+			if err != nil {
+				return err
+			}
+			addressesResolved += 1
+			_, _, err = initState.ResolveAddress(addr)
+			if err != nil {
+				return err
+			}
+		}
+
+		avgDepth := store.blocksRead / addressesResolved
+		avgData := store.dataRead / addressesResolved
+
+		fmt.Println("depth: ", avgDepth)
+		fmt.Println("data: ", avgData)
+
 		return nil
 	},
 }
