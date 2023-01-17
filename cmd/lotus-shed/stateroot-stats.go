@@ -13,12 +13,9 @@ import (
 	"github.com/filecoin-project/go-address"
 
 	"github.com/filecoin-project/lotus/api"
-	"github.com/filecoin-project/lotus/chain/actors/builtin"
-	"github.com/filecoin-project/lotus/chain/actors/builtin/account"
 	init_ "github.com/filecoin-project/lotus/chain/actors/builtin/init"
 	"github.com/filecoin-project/lotus/chain/types"
 	lcli "github.com/filecoin-project/lotus/cli"
-	"github.com/filecoin-project/lotus/tools/stats/ipldstore"
 	cbg "github.com/whyrusleeping/cbor-gen"
 )
 
@@ -27,6 +24,7 @@ var staterootCmd = &cli.Command{
 	Subcommands: []*cli.Command{
 		staterootDiffsCmd,
 		staterootStatCmd,
+		addressDepthStats,
 	},
 }
 
