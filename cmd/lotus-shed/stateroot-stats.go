@@ -272,6 +272,14 @@ var addressDepthStats = &cli.Command{
 		store := &trackingApiStore{ctx: ctx, api: api}
 		addressesResolved := 0
 
+		printStat := func() {
+			avgDepth := store.blocksRead / addressesResolved
+			avgData := store.dataRead / addressesResolved
+
+			fmt.Println("depth: ", avgDepth)
+			fmt.Println("data: ", avgData)
+		}
+
 		for _, actor := range actors {
 			addr, err := api.StateAccountKey(ctx, actor, tsk)
 			if err != nil {
@@ -291,13 +299,12 @@ var addressDepthStats = &cli.Command{
 			if err != nil {
 				return err
 			}
+			if addressesResolved%100 == 0 {
+				printStat()
+			}
 		}
 
-		avgDepth := store.blocksRead / addressesResolved
-		avgData := store.dataRead / addressesResolved
-
-		fmt.Println("depth: ", avgDepth)
-		fmt.Println("data: ", avgData)
+		printStat()
 
 		return nil
 	},
