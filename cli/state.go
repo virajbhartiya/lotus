@@ -1967,9 +1967,6 @@ var StateGetBlockHashCmd = &cli.Command{
 	Name:  "blockhash",
 	Usage: "Get the tipset CID - eth blockhash",
 	Action: func(cctx *cli.Context) error {
-		if !cctx.Args().Present() {
-			return ShowHelp(cctx, fmt.Errorf("must specify address to print market balance for"))
-		}
 
 		api, closer, err := GetFullNodeAPI(cctx)
 		if err != nil {
@@ -1988,7 +1985,7 @@ var StateGetBlockHashCmd = &cli.Command{
 		if err != nil {
 			return xerrors.Errorf("failed to get tipset key block: %w", err)
 		}
-		fmt.Printf("tipset CID: %d\n", blkCid)
+		fmt.Printf("tipset CID: %v\n", blkCid.Cid())
 		return nil
 	},
 }
