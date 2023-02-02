@@ -50,7 +50,7 @@ MAINTAINER Lotus Development Team
 
 WORKDIR /opt/filecoin
 
-RUN make hyperspacenet
+RUN make debug
 
 
 FROM builder-local AS builder
