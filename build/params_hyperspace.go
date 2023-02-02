@@ -63,6 +63,7 @@ var DrandSchedule = map[abi.ChainEpoch]DrandEnum{
 }
 
 var SupportedProofTypes = []abi.RegisteredSealProof{
+	abi.RegisteredSealProof_StackedDrg8MiBV1,
 	abi.RegisteredSealProof_StackedDrg512MiBV1,
 	abi.RegisteredSealProof_StackedDrg32GiBV1,
 	abi.RegisteredSealProof_StackedDrg64GiBV1,
