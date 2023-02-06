@@ -4,6 +4,7 @@ package store_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"testing"
 
@@ -85,6 +86,73 @@ func BenchmarkGetRandomness(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func BenchmarkTipsetCid(b *testing.B) {
+	cg, err := gen.NewGenerator()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	var last *types.TipSet
+	for i := 0; i < 220; i++ {
+		ts, err := cg.NextTipSet()
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		last = ts.TipSet.TipSet()
+	}
+
+	r, err := cg.YieldRepo()
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	lr, err := r.Lock(repo.FullNode)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	bs, err := lr.Blockstore(context.TODO(), repo.UniversalBlockstore)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	defer func() {
+		if c, ok := bs.(io.Closer); ok {
+			if err := c.Close(); err != nil {
+				b.Logf("WARN: failed to close blockstore: %s", err)
+			}
+		}
+	}()
+
+	mds, err := lr.Datastore(context.Background(), "/metadata")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	cs := store.NewChainStore(bs, bs, mds, filcns.Weight, nil)
+	defer cs.Close() //nolint:errcheck
+
+	getter := stmgr.TipSetGetterForTipset(cs, last)
+	b.ResetTimer()
+
+	for lk := 0; lk <= 220; lk++ {
+		lk := abi.ChainEpoch(lk)
+		b.Run(fmt.Sprintf("lookback=%d", lk), func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				tsk, err := getter(context.TODO(), last.Height()-lk)
+				if err != nil {
+					b.Fatal(err)
+				}
+				_, err = tsk.Cid()
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }
 
