@@ -717,3 +717,30 @@ func TestFEVMGetBlockDifficulty(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, len(ret), 32)
 }
+
+func TestFEVMGetBlockDifficultyEstimate(t *testing.T) {
+	ctx, cancel, client := kit.SetupFEVMTest(t)
+	defer cancel()
+
+	_, ethAddr, ethFilAddr := client.EVM().NewAccount()
+	kit.SendFunds(ctx, t, client, ethFilAddr, types.FromFil(1000))
+
+	//install contract
+	filenameActor := "contracts/GetDifficulty.hex"
+	fromAddr, actorAddr := client.EVM().DeployContractFromFilename(ctx, filenameActor)
+	contractAddr, err := ethtypes.EthAddressFromFilecoinAddress(actorAddr)
+	require.NoError(t, err)
+
+	ret, _, err := client.EVM().InvokeContractByFuncName(ctx, fromAddr, actorAddr, "getDifficulty()", []byte{})
+	require.NoError(t, err)
+	require.Equal(t, len(ret), 32)
+
+	gaslimit, err := client.EthEstimateGas(ctx, ethtypes.EthCall{
+		From: &ethAddr,
+		To:   &contractAddr,
+		Data: kit.CalcFuncSignature("getDifficulty()"),
+	})
+	require.NoError(t, err)
+	require.LessOrEqual(t, int64(gaslimit), build.BlockGasLimit)
+
+}
