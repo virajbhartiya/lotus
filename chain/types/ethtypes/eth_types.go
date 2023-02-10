@@ -45,6 +45,12 @@ func (e *EthUint64) UnmarshalJSON(b []byte) error {
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
+	if !startsWith0x(s) {
+		return fmt.Errorf("EthNonce UnmarshalJSON on %s failed, must start with 0x", s)
+	}
+
+	// XXX TODO check for leading zero
+
 	parsedInt, err := strconv.ParseUint(strings.Replace(s, "0x", "", -1), 16, 64)
 	if err != nil {
 		return err
@@ -81,10 +87,27 @@ func (e EthBigInt) MarshalJSON() ([]byte, error) {
 	return json.Marshal(fmt.Sprintf("0x%x", e.Int))
 }
 
+//hasLeadingZeroes returns true if s starts with 0x0 and is len 4 or longer
+func hasLeadingZeroes(s string) bool {
+	// Must be 3 or longer to start with 0x0 and 0x0 is valid
+	return strings.HasPrefix(s, "0x0") && len(s) > 3
+}
+
+//startsWith0x returns true if s starts with 0x
+func startsWith0x(s string) bool {
+	return strings.HasPrefix(s, "0x")
+}
+
 func (e *EthBigInt) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
+	}
+	if !startsWith0x(s) {
+		return fmt.Errorf("EthBigInt UnmarshalJSON on %s failed, must start with 0x", s)
+	}
+	if hasLeadingZeroes(s) {
+		return fmt.Errorf("EthBigInt UnmarshalJSON on %s failed, must not have a leading 0x0 before the value", s)
 	}
 
 	replaced := strings.Replace(s, "0x", "", -1)
@@ -114,6 +137,9 @@ func (e *EthBytes) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
+	}
+	if !startsWith0x(s) {
+		return fmt.Errorf("EthBytes UnmarshalJSON on %s failed, must start with 0x", s)
 	}
 
 	s = strings.Replace(s, "0x", "", -1)
@@ -234,6 +260,9 @@ func (n *EthNonce) UnmarshalJSON(b []byte) error {
 	var s string
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
+	}
+	if !startsWith0x(s) {
+		return fmt.Errorf("EthNonce UnmarshalJSON on %s failed, must start with 0x", s)
 	}
 
 	s = strings.Replace(s, "0x", "", -1)

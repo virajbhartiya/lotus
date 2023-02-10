@@ -71,7 +71,6 @@ func TestEthBigIntUnmarshalJSON(t *testing.T) {
 		{[]byte("\"0x400\""), EthBigInt(big.MustFromString("1024"))},
 		{[]byte("\"0xff1000000000000000000000000\""), EthBigInt(big.MustFromString("323330131220712761719252861321216"))},
 		{[]byte("\"0x98a0c6ef2224342b2a8727ae5111fd000000000000000000000000000000000\""), EthBigInt(big.MustFromString("4314726344238778862224669783019953265742676409691641697694925658285796229120"))},
-		{[]byte("\"0x098a0c6ef2224342b2a8727ae5111fd000000000000000000000000000000000\""), EthBigInt(big.MustFromString("4314726344238778862224669783019953265742676409691641697694925658285796229120"))},
 	}
 
 	for _, tc := range testcases {
@@ -79,6 +78,24 @@ func TestEthBigIntUnmarshalJSON(t *testing.T) {
 		err := i.UnmarshalJSON(tc.Input.([]byte))
 		require.Nil(t, err)
 		require.Equal(t, i, tc.Output)
+	}
+}
+
+func TestEthBigIntUnmarshalJSONFails(t *testing.T) {
+	testcases := [][]byte{
+		[]byte("\"0x098a0c6ef2224342b2a8727ae5111fd000000000000000000000000000000000\""),
+		[]byte("\"0x09\""),
+		[]byte("\"0x0000000001\""),
+		[]byte("\"0x00000000010\""),
+		[]byte("\"0x\""),
+		[]byte("\"abcdefgh\""),
+	}
+
+	for _, tc := range testcases {
+		t.Log(string(tc))
+		var i EthBigInt
+		err := i.UnmarshalJSON(tc)
+		require.Error(t, err)
 	}
 }
 
