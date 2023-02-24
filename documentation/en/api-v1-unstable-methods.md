@@ -8801,8 +8801,7 @@ Response:
 
 ### WalletNew
 WalletNew creates a new address in the wallet with the given sigType.
-Available key types: bls, secp256k1, secp256k1-ledger
-Support for numerical types: 1 - secp256k1, 2 - BLS is deprecated
+Available key types: bls, secp256k1, secp256k1-ledger, delegated
 
 
 Perms: write
