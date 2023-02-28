@@ -639,17 +639,23 @@ func (s *SplitStore) doCompact(curTs *types.TipSet) error {
 
 	// some stats for logging
 	var hotCnt, coldCnt, purgeCnt int
+	var hotSize, purgeSize int
 	err = s.hot.ForEachKey(func(c cid.Cid) error {
 		// was it marked?
 		mark, err := markSet.Has(c)
 		if err != nil {
 			return xerrors.Errorf("error checking mark set for %s: %w", c, err)
 		}
-
+		sz, err := s.hot.GetSize(s.ctx, c)
+		if err != nil {
+			log.Errorf("Error measure size of %s which should be in hot store %w", c, err)
+		}
 		if mark {
 			hotCnt++
+			hotSize += sz
 			return nil
 		}
+		purgeSize += sz
 
 		// it needs to be removed from hot store, mark it as candidate for purge
 		if err := purgew.Write(c); err != nil {
@@ -690,6 +696,7 @@ func (s *SplitStore) doCompact(curTs *types.TipSet) error {
 	log.Infow("cold collection done", "took", time.Since(startCollect))
 
 	log.Infow("compaction stats", "hot", hotCnt, "cold", coldCnt, "purge", purgeCnt)
+	log.Infow("hot store size stats", "hot", hotSize, "purge", purgeSize)
 	stats.Record(s.ctx, metrics.SplitstoreCompactionHot.M(int64(hotCnt)))
 	stats.Record(s.ctx, metrics.SplitstoreCompactionCold.M(int64(coldCnt)))
 
