@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/ipfs/go-datastore"
@@ -31,6 +32,7 @@ var splitstoreCmd = &cli.Command{
 		splitstoreClearCmd,
 		splitstoreCheckCmd,
 		splitstoreInfoCmd,
+		splitstoreHotGCCmd,
 	},
 }
 
@@ -352,6 +354,52 @@ func deleteSplitstoreKeys(lr repo.LockedRepo) error {
 
 	return nil
 }
+func gcHotStore(lr repo.LockedRepo, threshold float64) error {
+	repoPath := lr.Path()
+	dataPath := filepath.Join(repoPath, "datastore")
+	hotPath := filepath.Join(dataPath, "splitstore", "hot.badger")
+
+	blog := &badgerLogger{
+		SugaredLogger: log.Desugar().WithOptions(zap.AddCallerSkip(1)).Sugar(),
+		skip2:         log.Desugar().WithOptions(zap.AddCallerSkip(2)).Sugar(),
+	}
+
+	hotOpts, err := repo.BadgerBlockstoreOptions(repo.HotBlockstore, hotPath, true)
+	if err != nil {
+		return xerrors.Errorf("error getting hotstore badger options: %w", err)
+	}
+	hotOpts.Logger = blog
+
+	hot, err := badger.Open(hotOpts.Options)
+	if err != nil {
+		return xerrors.Errorf("error opening hotstore: %w", err)
+	}
+	defer hot.Close() //nolint
+
+	// compact to gather vlog GC stats and then GC at specified threshold
+	compactStart := time.Now()
+	fmt.Println("flattening hotstore...")
+	nworkers := runtime.NumCPU()
+	if nworkers < 2 {
+		nworkers = 2
+	}
+	err = hot.Flatten(nworkers)
+	if err != nil {
+		return xerrors.Errorf("error compacting hotstore: %w", err)
+	}
+	fmt.Printf("flatten took %v", time.Since(compactStart))
+	fmt.Println("garbage collecting hotstore...")
+	gcStart := time.Now()
+	err = hot.RunValueLogGC(threshold)
+	if err == badger.ErrNoRewrite {
+		fmt.Println("NoRewrite returned")
+	}
+	if err != badger.ErrNoRewrite {
+		return xerrors.Errorf("error garbage collecting coldstore: %w", err)
+	}
+	fmt.Printf("vlog gc took %v", time.Since(gcStart))
+	return nil
+}
 
 // badger logging through go-log
 type badgerLogger struct {
@@ -401,5 +449,56 @@ var splitstoreInfoCmd = &cli.Command{
 		}
 
 		return nil
+	},
+}
+
+var splitstoreHotGCCmd = &cli.Command{
+	Name:        "hot-gc",
+	Description: "Badger vlog GC on hotstore of stopped daemon",
+	Flags: []cli.Flag{
+		&cli.StringFlag{
+			Name:  "repo",
+			Value: "~/.lotus",
+		},
+		&cli.Float64Flag{
+			Name:  "threshold",
+			Value: 0.125,
+		},
+	},
+	Action: func(cctx *cli.Context) error {
+		r, err := repo.NewFS(cctx.String("repo"))
+		if err != nil {
+			return xerrors.Errorf("error opening fs repo: %w", err)
+		}
+
+		exists, err := r.Exists()
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return xerrors.Errorf("lotus repo doesn't exist")
+		}
+
+		lr, err := r.Lock(repo.FullNode)
+		if err != nil {
+			return xerrors.Errorf("error locking repo: %w", err)
+		}
+		defer lr.Close() //nolint:errcheck
+
+		cfg, err := lr.Config()
+		if err != nil {
+			return xerrors.Errorf("error getting config: %w", err)
+		}
+
+		fncfg, ok := cfg.(*config.FullNode)
+		if !ok {
+			return xerrors.Errorf("wrong config type: %T", cfg)
+		}
+
+		if !fncfg.Chainstore.EnableSplitstore {
+			return xerrors.Errorf("splitstore is not enabled")
+		}
+		threshold := cctx.Float64("threshold")
+		return gcHotStore(lr, threshold)
 	},
 }
