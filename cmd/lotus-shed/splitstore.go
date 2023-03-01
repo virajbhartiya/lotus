@@ -400,7 +400,7 @@ func gcHotStore(lr repo.LockedRepo, threshold float64, override string) error {
 	if err == badger.ErrNoRewrite {
 		fmt.Println("NoRewrite returned")
 	}
-	if err != badger.ErrNoRewrite {
+	if err != nil && err != badger.ErrNoRewrite {
 		return xerrors.Errorf("error garbage collecting coldstore: %w", err)
 	}
 	fmt.Printf("vlog gc took %v", time.Since(gcStart))
