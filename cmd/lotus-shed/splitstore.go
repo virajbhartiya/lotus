@@ -354,10 +354,16 @@ func deleteSplitstoreKeys(lr repo.LockedRepo) error {
 
 	return nil
 }
-func gcHotStore(lr repo.LockedRepo, threshold float64) error {
+func gcHotStore(lr repo.LockedRepo, threshold float64, override string) error {
 	repoPath := lr.Path()
 	dataPath := filepath.Join(repoPath, "datastore")
-	hotPath := filepath.Join(dataPath, "splitstore", "hot.badger")
+
+	hotPath := ""
+	if override == "" {
+		hotPath = filepath.Join(dataPath, "splitstore", "hot.badger")
+	} else {
+		hotPath = filepath.Join(dataPath, "splitstore", override)
+	}
 
 	blog := &badgerLogger{
 		SugaredLogger: log.Desugar().WithOptions(zap.AddCallerSkip(1)).Sugar(),
@@ -464,6 +470,10 @@ var splitstoreHotGCCmd = &cli.Command{
 			Name:  "threshold",
 			Value: 0.125,
 		},
+		&cli.StringFlag{
+			Name:  "override-hotstore-path",
+			Value: "",
+		},
 	},
 	Action: func(cctx *cli.Context) error {
 		r, err := repo.NewFS(cctx.String("repo"))
@@ -499,6 +509,7 @@ var splitstoreHotGCCmd = &cli.Command{
 			return xerrors.Errorf("splitstore is not enabled")
 		}
 		threshold := cctx.Float64("threshold")
-		return gcHotStore(lr, threshold)
+		maybeHotStoreOverride := cctx.String("override-hotstore-path")
+		return gcHotStore(lr, threshold, maybeHotStoreOverride)
 	},
 }
