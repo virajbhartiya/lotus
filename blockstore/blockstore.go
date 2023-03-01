@@ -45,11 +45,20 @@ type BlockstoreGCOption = func(*BlockstoreGCOptions) error
 // BlockstoreGCOptions is a struct with GC options
 type BlockstoreGCOptions struct {
 	FullGC bool
+	// fraction of garbage in badger vlog before its worth online GCing
+	Threshold float64
 }
 
 func WithFullGC(fullgc bool) BlockstoreGCOption {
 	return func(opts *BlockstoreGCOptions) error {
 		opts.FullGC = fullgc
+		return nil
+	}
+}
+
+func WithThreshold(threshold float64) BlockstoreGCOption {
+	return func(opts *BlockstoreGCOptions) error {
+		opts.Threshold = threshold
 		return nil
 	}
 }

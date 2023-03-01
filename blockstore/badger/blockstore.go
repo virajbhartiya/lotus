@@ -44,7 +44,8 @@ const (
 	// MemoryMap is equivalent to badger/options.MemoryMap.
 	MemoryMap = options.MemoryMap
 	// LoadToRAM is equivalent to badger/options.LoadToRAM.
-	LoadToRAM = options.LoadToRAM
+	LoadToRAM          = options.LoadToRAM
+	defaultGCThreshold = 0.125
 )
 
 // Options embeds the badger options themselves, and augments them with
@@ -439,15 +440,12 @@ func (b *Blockstore) deleteDB(path string) {
 	}
 }
 
-func (b *Blockstore) onlineGC() error {
+func (b *Blockstore) onlineGC(threshold float64) error {
 	b.lockDB()
 	defer b.unlockDB()
 
 	// compact first to gather the necessary statistics for GC
-	nworkers := runtime.NumCPU() / 2
-	if nworkers < 2 {
-		nworkers = 2
-	}
+	nworkers := 2
 
 	err := b.db.Flatten(nworkers)
 	if err != nil {
@@ -455,7 +453,7 @@ func (b *Blockstore) onlineGC() error {
 	}
 
 	for err == nil {
-		err = b.db.RunValueLogGC(0.125)
+		err = b.db.RunValueLogGC(threshold)
 	}
 
 	if err == badger.ErrNoRewrite {
@@ -485,8 +483,12 @@ func (b *Blockstore) CollectGarbage(opts ...blockstore.BlockstoreGCOption) error
 	if options.FullGC {
 		return b.movingGC()
 	}
+	threshold := options.Threshold
+	if threshold == 0 {
+		threshold = defaultGCThreshold
+	}
 
-	return b.onlineGC()
+	return b.onlineGC(threshold)
 }
 
 // Size returns the aggregate size of the blockstore

@@ -245,6 +245,23 @@ func Open(path string, ds dstore.Datastore, hot, cold bstore.Blockstore, cfg *Co
 		}
 	}
 
+	// Experiment: try persistent GC at a low threshold
+	go func() {
+		opts := []bstore.BlockstoreGCOption{bstore.WithThreshold(0.01)}
+		for {
+			start := time.Now()
+			if err := ss.gcBlockstore(ss.hot, opts); err != nil {
+				log.Warnf("error garbage collecting hotstore: %s", err)
+			}
+			gcTime := time.Since(start)
+			log.Infof("GC took %v", gcTime)
+			if err := ss.checkClosing(); err != nil {
+				log.Warnf("splitstore closing, stop GC")
+				break
+			}
+		}
+	}()
+
 	if ss.checkpointExists() {
 		log.Info("found compaction checkpoint; resuming compaction")
 		if err := ss.completeCompaction(); err != nil {
