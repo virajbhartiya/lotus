@@ -247,6 +247,7 @@ func Open(path string, ds dstore.Datastore, hot, cold bstore.Blockstore, cfg *Co
 
 	// Experiment: try persistent GC at a low threshold
 	go func() {
+		log.Infof("Splitstore persistent GC starting")
 		opts := []bstore.BlockstoreGCOption{bstore.WithThreshold(0.01)}
 		for {
 			start := time.Now()
