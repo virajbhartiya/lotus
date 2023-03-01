@@ -370,7 +370,7 @@ func gcHotStore(lr repo.LockedRepo, threshold float64, override string) error {
 		skip2:         log.Desugar().WithOptions(zap.AddCallerSkip(2)).Sugar(),
 	}
 
-	hotOpts, err := repo.BadgerBlockstoreOptions(repo.HotBlockstore, hotPath, true)
+	hotOpts, err := repo.BadgerBlockstoreOptions(repo.HotBlockstore, hotPath, false)
 	if err != nil {
 		return xerrors.Errorf("error getting hotstore badger options: %w", err)
 	}
