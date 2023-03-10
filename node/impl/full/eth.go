@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -1823,6 +1824,14 @@ func newEthBlockFromFilecoinTipSet(ctx context.Context, ts *types.TipSet, fullTx
 	for _, msg := range compOutput.Trace {
 		// skip system messages like reward application and cron
 		if msg.Msg.From == builtintypes.SystemActorAddr {
+			continue
+		}
+
+		// Hyperspace only: nv20 shipped with a bug that allowed Lotus to include
+		// messages that did not cover inclusion gas. Filter those out.
+		if strings.Contains(msg.Error, "pre-validation failed: Out of gas") {
+			// skip messages that were included on-chain due to Lotus and ref-fvm
+			// using different inclusion criteria.
 			continue
 		}
 
