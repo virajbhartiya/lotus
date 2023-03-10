@@ -6,6 +6,8 @@ import (
 	"context"
 	"testing"
 
+	logging "github.com/ipfs/go-log/v2"
+
 	"github.com/ipfs/go-datastore"
 	syncds "github.com/ipfs/go-datastore/sync"
 	"github.com/stretchr/testify/assert"
@@ -23,6 +25,7 @@ func TestIndexSeeks(t *testing.T) {
 	//stm: @CHAIN_STORE_IMPORT_001
 	//stm: @CHAIN_STORE_GET_TIPSET_BY_HEIGHT_001, @CHAIN_STORE_PUT_TIPSET_001, @CHAIN_STORE_SET_GENESIS_BLOCK_001
 	//stm: @CHAIN_STORE_CLOSE_001
+	logging.SetLogLevel("chainstore", "error")
 	cg, err := gen.NewGenerator()
 	if err != nil {
 		t.Fatal(err)
@@ -52,8 +55,9 @@ func TestIndexSeeks(t *testing.T) {
 	}
 	assert.NoError(t, cs.SetGenesis(ctx, gen))
 
-	// Put 113 blocks from genesis
-	for i := 0; i < 113; i++ {
+	const size = 3
+	// Put 1250 blocks from genesis
+	for i := 0; i < 1250<<size; i++ {
 		nextts := mock.TipSet(mock.MkBlock(cur, 1, 1))
 
 		if err := cs.PutTipSet(ctx, nextts); err != nil {
@@ -76,13 +80,22 @@ func TestIndexSeeks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assert.Equal(t, abi.ChainEpoch(164), ts.Height())
+	assert.Equal(t, abi.ChainEpoch((1250<<size)+1+50), ts.Height())
 
-	for i := 0; i <= 113; i++ {
+	for i := 0; i <= 15; i++ {
 		ts3, err := cs.GetTipsetByHeight(ctx, abi.ChainEpoch(i), skipts, false)
 		if err != nil {
 			t.Fatal(err)
 		}
 		assert.Equal(t, abi.ChainEpoch(i), ts3.Height())
 	}
+	total := 0
+	for _, v := range cs.Cindex().CacheHistogram() {
+		total += v
+	}
+	for i, v := range cs.Cindex().CacheHistogram() {
+		t.Logf("%d: %d (%.2f)", i, v, 100*float64(v)/float64(total))
+	}
+	t.Logf("TipsetLoads: %d", store.LoadsFromBlockstore)
+
 }

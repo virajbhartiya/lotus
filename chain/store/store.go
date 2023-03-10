@@ -1145,6 +1145,10 @@ func (cs *ChainStore) TryFillTipSet(ctx context.Context, ts *types.TipSet) (*Ful
 	return NewFullTipSet(out), nil
 }
 
+func (cs *ChainStore) Cindex() *ChainIndex {
+	return cs.cindex
+}
+
 // GetTipsetByHeight returns the tipset on the chain behind 'ts' at the given
 // height. In the case that the given height is a null round, the 'prev' flag
 // selects the tipset before the null round if true, and the tipset following
