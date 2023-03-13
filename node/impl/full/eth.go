@@ -423,7 +423,6 @@ func (a *EthModule) EthGetTransactionReceipt(ctx context.Context, txHash ethtype
 		return nil, nil
 	}
 
-	a.
 	tx, err := newEthTxFromMessageLookup(ctx, msgLookup, -1, a.Chain, a.StateAPI)
 	if err != nil {
 		return nil, nil
@@ -437,7 +436,7 @@ func (a *EthModule) EthGetTransactionReceipt(ctx context.Context, txHash ethtype
 		}
 	}
 
-	receipt, err := newEthTxReceipt(ctx, tx, msgLookup, events, a.StateAPI)
+	receipt, err := newEthTxReceipt(ctx, tx, msgLookup, events, a.Chain, a.StateAPI)
 	if err != nil {
 		return nil, nil
 	}
@@ -2043,7 +2042,7 @@ func newEthTxFromMessageLookup(ctx context.Context, msgLookup *api.MsgLookup, tx
 	return tx, nil
 }
 
-func newEthTxReceipt(ctx context.Context, tx ethtypes.EthTx, lookup *api.MsgLookup, events []types.Event, sa StateAPI) (api.EthTxReceipt, error) {
+func newEthTxReceipt(ctx context.Context, tx ethtypes.EthTx, lookup *api.MsgLookup, events []types.Event, cs *store.ChainStore, sa StateAPI) (api.EthTxReceipt, error) {
 	var (
 		transactionIndex ethtypes.EthUint64
 		blockHash        ethtypes.EthHash
@@ -2074,8 +2073,7 @@ func newEthTxReceipt(ctx context.Context, tx ethtypes.EthTx, lookup *api.MsgLook
 
 	if lookup.Receipt.ExitCode.IsSuccess() {
 		receipt.Status = 1
-	}
-	if lookup.Receipt.ExitCode.IsError() {
+	} else {
 		receipt.Status = 0
 	}
 
@@ -2084,11 +2082,17 @@ func newEthTxReceipt(ctx context.Context, tx ethtypes.EthTx, lookup *api.MsgLook
 	// TODO: handle CumulativeGasUsed
 	receipt.CumulativeGasUsed = ethtypes.EmptyEthInt
 
-	gasOutputs := vm.ComputeGasOutputs(lookup.Receipt.GasUsed, lookup.Receipt, vm.baseFee, msg.GasFeeCap, msg.GasPremium, true)
-	big.Sub(msg.RequiredFunds(), ret.GasCosts.Refund)
-	gasOutputs.
+	// TODO: avoid loading the tipset twice (once here, once in the when we convert the message to a txn)
+	ts, err := cs.GetTipSetFromKey(ctx, lookup.TipSet)
+	if err != nil {
+		return api.EthTxReceipt{}, err
+	}
 
-	effectiveGasPrice := big.Div(lookup.GasCost.TotalCost, big.NewInt(replay.MsgRct.GasUsed))
+	baseFee := ts.Blocks()[0].ParentBaseFee
+	gasOutputs := vm.ComputeGasOutputs(lookup.Receipt.GasUsed, int64(tx.Gas), baseFee, big.Int(tx.MaxFeePerGas), big.Int(tx.MaxPriorityFeePerGas), true)
+	totalBurnt := big.Sum(gasOutputs.BaseFeeBurn, gasOutputs.MinerTip, gasOutputs.OverEstimationBurn)
+
+	effectiveGasPrice := big.Div(totalBurnt, big.NewInt(lookup.Receipt.GasUsed))
 	receipt.EffectiveGasPrice = ethtypes.EthBigInt(effectiveGasPrice)
 
 	if receipt.To == nil && lookup.Receipt.ExitCode.IsSuccess() {
