@@ -1173,6 +1173,11 @@ var ChainExportRangeCmd = &cli.Command{
 			Value: false,
 		},
 		&cli.BoolFlag{
+			Name:  "events",
+			Usage: "specify if events should be include",
+			Value: false,
+		},
+		&cli.BoolFlag{
 			Name:  "stateroots",
 			Usage: "specify if stateroots should be include",
 			Value: false,
@@ -1241,6 +1246,7 @@ var ChainExportRangeCmd = &cli.Command{
 			NumWorkers:        cctx.Int("workers"),
 			IncludeMessages:   cctx.Bool("messages"),
 			IncludeReceipts:   cctx.Bool("receipts"),
+			IncludeEvents:     cctx.Bool("events"),
 			IncludeStateRoots: cctx.Bool("stateroots"),
 		})
 		if err != nil {

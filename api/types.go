@@ -403,5 +403,6 @@ type ChainExportConfig struct {
 	NumWorkers        int
 	IncludeMessages   bool
 	IncludeReceipts   bool
+	IncludeEvents     bool
 	IncludeStateRoots bool
 }

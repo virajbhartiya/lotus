@@ -20,6 +20,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
+	blockadt "github.com/filecoin-project/specs-actors/actors/util/adt"
 
 	bstore "github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/build"
@@ -248,6 +249,7 @@ type walkSchedulerConfig struct {
 	tail            *types.TipSet // Tipset to end at.
 	includeMessages bool
 	includeReceipts bool
+	includeEvents   bool
 	includeState    bool
 }
 
@@ -489,6 +491,17 @@ func (s *walkScheduler) processTask(t walkTask, workerN int) error {
 
 		return nil
 	}
+	if !s.cfg.includeEvents && t.taskType == receiptTask {
+		a, err := blockadt.AsArray(ActorStore(s.ctx, s.store), t.c)
+		if err != nil {
+			return err
+		}
+		// How do I handle intermediate nodes?
+		var r abi.CborBytesTransparent
+		a.ForEach(&r, func(i int64) error {
+			panic("TODO: walk receipts without including events")
+		})
+	}
 
 	// Not a chain-block: we scan for CIDs in the raw block-data
 	return cbg.ScanForLinks(bytes.NewReader(blk.RawData()), func(c cid.Cid) {
@@ -507,7 +520,7 @@ func (cs *ChainStore) ExportRange(
 	ctx context.Context,
 	w io.Writer,
 	head, tail *types.TipSet,
-	messages, receipts, stateroots bool,
+	messages, receipts, events, stateroots bool,
 	workers int) error {
 
 	h := &car.CarHeader{
@@ -535,6 +548,7 @@ func (cs *ChainStore) ExportRange(
 		tail:            tail,
 		includeMessages: messages,
 		includeState:    stateroots,
+		includeEvents:   events,
 		includeReceipts: receipts,
 	}
 

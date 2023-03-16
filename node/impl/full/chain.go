@@ -624,7 +624,7 @@ func (a ChainAPI) ChainExportRangeInternal(ctx context.Context, head, tail types
 	if err := a.Chain.ExportRange(ctx,
 		bw,
 		headTs, tailTs,
-		cfg.IncludeMessages, cfg.IncludeReceipts, cfg.IncludeStateRoots,
+		cfg.IncludeMessages, cfg.IncludeReceipts, cfg.IncludeEvents, cfg.IncludeStateRoots,
 		cfg.NumWorkers,
 	); err != nil {
 		return fmt.Errorf("exporting chain range: %w", err)
