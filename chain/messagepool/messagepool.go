@@ -136,9 +136,11 @@ type MessagePool struct {
 	localAddrs map[address.Address]struct{}
 
 	// do NOT access this map directly, use getPendingMset, setPendingMset, deletePendingMset, forEachPending, and clearPending respectively
-	pending map[address.Address]*msgSet
+	pending     map[address.Address]*msgSet
+	pendingLock sync.RWMutex
 
-	keyCache map[address.Address]address.Address
+	keyCache     map[address.Address]address.Address
+	keyCacheLock sync.RWMutex
 
 	curTsLk sync.Mutex // DO NOT LOCK INSIDE lk
 	curTs   *types.TipSet
@@ -456,6 +458,8 @@ func (mp *MessagePool) TryForEachPendingMessage(f func(cid.Cid) error) error {
 	}
 	defer mp.lk.Unlock()
 
+	mp.pendingLock.RLock()
+	defer mp.pendingLock.RUnlock()
 	for _, mset := range mp.pending {
 		for _, m := range mset.msgs {
 			err := f(m.Cid())
@@ -474,8 +478,11 @@ func (mp *MessagePool) TryForEachPendingMessage(f func(cid.Cid) error) error {
 }
 
 func (mp *MessagePool) resolveToKey(ctx context.Context, addr address.Address) (address.Address, error) {
-	// check the cache
+
+	mp.keyCacheLock.RLock()
 	a, f := mp.keyCache[addr]
+	mp.keyCacheLock.RUnlock()
+
 	if f {
 		return a, nil
 	}
@@ -487,8 +494,10 @@ func (mp *MessagePool) resolveToKey(ctx context.Context, addr address.Address) (
 	}
 
 	// place both entries in the cache (may both be key addresses, which is fine)
+	mp.keyCacheLock.Lock()
 	mp.keyCache[addr] = ka
 	mp.keyCache[ka] = ka
+	mp.keyCacheLock.Unlock()
 
 	return ka, nil
 }
@@ -499,7 +508,9 @@ func (mp *MessagePool) getPendingMset(ctx context.Context, addr address.Address)
 		return nil, false, err
 	}
 
+	mp.pendingLock.RLock()
 	ms, f := mp.pending[ra]
+	mp.pendingLock.RUnlock()
 
 	return ms, f, nil
 }
@@ -510,13 +521,17 @@ func (mp *MessagePool) setPendingMset(ctx context.Context, addr address.Address,
 		return err
 	}
 
+	mp.pendingLock.Lock()
 	mp.pending[ra] = ms
+	mp.pendingLock.Unlock()
 
 	return nil
 }
 
 // This method isn't strictly necessary, since it doesn't resolve any addresses, but it's safer to have
 func (mp *MessagePool) forEachPending(f func(address.Address, *msgSet)) {
+	mp.pendingLock.RLock()
+	defer mp.pendingLock.RUnlock()
 	for la, ms := range mp.pending {
 		f(la, ms)
 	}
@@ -528,6 +543,8 @@ func (mp *MessagePool) deletePendingMset(ctx context.Context, addr address.Addre
 		return err
 	}
 
+	mp.pendingLock.Lock()
+	defer mp.pendingLock.Unlock()
 	delete(mp.pending, ra)
 
 	return nil
@@ -535,6 +552,9 @@ func (mp *MessagePool) deletePendingMset(ctx context.Context, addr address.Addre
 
 // This method isn't strictly necessary, since it doesn't resolve any addresses, but it's safer to have
 func (mp *MessagePool) clearPending() {
+	mp.pendingLock.Lock()
+	defer mp.pendingLock.Unlock()
+
 	mp.pending = make(map[address.Address]*msgSet)
 }
 
