@@ -134,6 +134,8 @@ type State interface {
 	GetSectorExpiration(abi.SectorNumber) (*SectorExpiration, error)
 	GetPrecommittedSector(abi.SectorNumber) (*SectorPreCommitOnChainInfo, error)
 	ForEachPrecommittedSector(func(SectorPreCommitOnChainInfo) error) error
+
+	// to get all sectors pass nil
 	LoadSectors(sectorNos *bitfield.BitField) ([]*SectorOnChainInfo, error)
 	NumLiveSectors() (uint64, error)
 	IsAllocated(abi.SectorNumber) (bool, error)
