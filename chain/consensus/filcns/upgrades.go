@@ -1713,7 +1713,7 @@ func PreUpgradeActorsV11(ctx context.Context, sm *stmgr.StateManager, cache stmg
 
 	config := migration.Config{
 		MaxWorkers:        uint(workerCount),
-		ProgressLogPeriod: time.Minute * 5,
+		ProgressLogPeriod: time.Second * 10,
 	}
 
 	_, err = upgradeActorsV11Common(ctx, sm, cache, lbRoot, epoch, lbts, config)
