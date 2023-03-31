@@ -146,7 +146,6 @@ var migrationsCmd = &cli.Command{
 		defer func() {
 			if err := ss.Close(); err != nil {
 				log.Warnf("failed to close blockstore: %s", err)
-
 			}
 		}()
 		bs := ss

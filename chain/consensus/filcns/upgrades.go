@@ -1746,8 +1746,8 @@ func upgradeActorsV11Common(
 	config migration.Config,
 ) (cid.Cid, error) {
 	// XXX: use noop blockstore to measure compute costs while ignoring write costs for now
-	buf := blockstore.NewTieredBstore(sm.ChainStore().StateBlockstore(), blockstore.NewDiscardStore(sm.ChainStore().StateBlockstore()))
-	store := store.ActorStore(ctx, buf)
+	writeStore := blockstore.NewAutobatch(ctx, sm.ChainStore().StateBlockstore(), units.GiB/4)
+	store := store.ActorStore(ctx, writeStore)
 
 	// ensure that the manifest is loaded in the blockstore
 	// XXX: using noop bundle since we don't actually care about the code cids, will need to load v11 for real migration
