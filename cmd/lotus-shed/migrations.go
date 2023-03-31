@@ -169,22 +169,22 @@ var migrationsCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
+		var newCid cid.Cid
+		if cctx.IsSet("skip-pre-migration") {
+			startTime := time.Now()
 
-		startTime := time.Now()
+			newCid, err = upgradeActorsFunc(ctx, sm, nv15.NewMemMigrationCache(), nil, blk.ParentStateRoot, blk.Height-1, migrationTs)
+			if err != nil {
+				return err
+			}
 
-		newCid2, err := upgradeActorsFunc(ctx, sm, nv15.NewMemMigrationCache(), nil, blk.ParentStateRoot, blk.Height-1, migrationTs)
-		if err != nil {
-			return err
-		}
+			uncachedMigrationTime := time.Since(startTime)
 
-		uncachedMigrationTime := time.Since(startTime)
-
-		fmt.Println("migration height ", blk.Height-1)
-		fmt.Println("old cid ", blk.ParentStateRoot)
-		fmt.Println("new cid ", newCid2)
-		fmt.Println("completed round actual (without cache), took ", uncachedMigrationTime)
-
-		if !cctx.IsSet("skip-pre-migration") {
+			fmt.Println("migration height ", blk.Height-1)
+			fmt.Println("old cid ", blk.ParentStateRoot)
+			fmt.Println("new cid ", newCid)
+			fmt.Println("completed round actual (without cache), took ", uncachedMigrationTime)
+		} else {
 			cache := mutil.NewMemMigrationCache()
 
 			ts1, err := cs.GetTipsetByHeight(ctx, blk.Height-60, migrationTs, false)
@@ -192,7 +192,7 @@ var migrationsCmd = &cli.Command{
 				return err
 			}
 
-			startTime = time.Now()
+			startTime := time.Now()
 
 			err = preUpgradeActorsFunc(ctx, sm, cache, ts1.ParentState(), ts1.Height()-1, ts1)
 			if err != nil {
@@ -204,17 +204,15 @@ var migrationsCmd = &cli.Command{
 
 			startTime = time.Now()
 
-			newCid1, err := upgradeActorsFunc(ctx, sm, cache, nil, blk.ParentStateRoot, blk.Height-1, migrationTs)
+			newCid, err = upgradeActorsFunc(ctx, sm, cache, nil, blk.ParentStateRoot, blk.Height-1, migrationTs)
 			if err != nil {
 				return err
 			}
+			fmt.Println("migration height ", blk.Height-1)
+			fmt.Println("old cid ", blk.ParentStateRoot)
+			fmt.Println("new cid ", newCid)
 
 			cachedMigrationTime := time.Since(startTime)
-
-			if newCid1 != newCid2 {
-				return xerrors.Errorf("got different results with and without the cache: %s, %s", newCid1,
-					newCid2)
-			}
 
 			fmt.Println("completed round actual (with cache), took ", cachedMigrationTime)
 		}
@@ -223,7 +221,7 @@ var migrationsCmd = &cli.Command{
 			if checkInvariantsFunc == nil {
 				return xerrors.Errorf("check invariants not implemented for nv%d", nv)
 			}
-			err = checkInvariantsFunc(ctx, blk.ParentStateRoot, newCid2, bs, blk.Height-1)
+			err = checkInvariantsFunc(ctx, blk.ParentStateRoot, newCid, bs, blk.Height-1)
 			if err != nil {
 				return err
 			}
