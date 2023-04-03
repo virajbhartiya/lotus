@@ -349,6 +349,8 @@ github.com/filecoin-project/go-state-types v0.1.8/go.mod h1:UwGVoMsULoCK+bWjEdd/
 github.com/filecoin-project/go-state-types v0.1.10/go.mod h1:UwGVoMsULoCK+bWjEdd/xLCvLAQFBC7EDT477SKml+Q=
 github.com/filecoin-project/go-state-types v0.11.0-alpha-1.0.20230331010229-5fdb8a8cc011 h1:7Xheu5X5cu7xqN6G5fFoL8lpM8U4qzIyrXQ9OeHCZAw=
 github.com/filecoin-project/go-state-types v0.11.0-alpha-1.0.20230331010229-5fdb8a8cc011/go.mod h1:aLIas+W8BWAfpLWEPUOGMPBdhcVwoCG4pIQSQk26024=
+github.com/filecoin-project/go-state-types v0.11.0-alpha-1.0.20230403161054-59d410c46622 h1:35uFFX23dzTwMO91XolcN4qVb5pM3ONFe/l0OFMutFE=
+github.com/filecoin-project/go-state-types v0.11.0-alpha-1.0.20230403161054-59d410c46622/go.mod h1:aLIas+W8BWAfpLWEPUOGMPBdhcVwoCG4pIQSQk26024=
 github.com/filecoin-project/go-statemachine v0.0.0-20200925024713-05bd7c71fbfe/go.mod h1:FGwQgZAt2Gh5mjlwJUlVB62JeYdo+if0xWxSEfBD9ig=
 github.com/filecoin-project/go-statemachine v1.0.3 h1:N07o6alys+V1tNoSTi4WuuoeNC4erS/6jE74+NsgQuk=
 github.com/filecoin-project/go-statemachine v1.0.3/go.mod h1:jZdXXiHa61n4NmgWFG4w8tnqgvZVHYbJ3yW7+y8bF54=
