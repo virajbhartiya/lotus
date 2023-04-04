@@ -1229,6 +1229,13 @@ func (mp *MessagePool) pendingFor(ctx context.Context, a address.Address) []*typ
 }
 
 func (mp *MessagePool) HeadChange(ctx context.Context, revert []*types.TipSet, apply []*types.TipSet) error {
+
+	//ensures computations are cached for last tipset in apply without holding lock
+	mp.curTsLk.RLock()
+	_, _ = mp.api.GetActorAfter(m.Message.From, apply[len(apply)-1])
+	_, _ = mp.getStateNonce(ctx, m.Message.From, apply[len(apply)-1])
+	mp.curTsLk.RUnlock()
+
 	mp.curTsLk.Lock()
 	defer mp.curTsLk.Unlock()
 
