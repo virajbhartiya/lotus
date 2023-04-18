@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/filecoin-project/go-state-types/network"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/blockstore"
+	badgerbs "github.com/filecoin-project/lotus/blockstore/badger"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/beacon"
 	"github.com/filecoin-project/lotus/chain/beacon/drand"
@@ -88,6 +90,11 @@ func main() {
 				Usage: "dumps a trace in CWD for every message with exit code (except OOG), return data, or events mismatches",
 				Value: true,
 			},
+			&cli.BoolFlag{
+				Name:  "splitstore",
+				Usage: "whether or not the store is a splitstore",
+				Value: true,
+			},
 		},
 		Before: func(cctx *cli.Context) error {
 			return logging.SetLogLevel("lotus-rebase", cctx.String("log-level"))
@@ -123,7 +130,7 @@ func run(cctx *cli.Context) error {
 		ctx = cctx.Context
 	)
 
-	bs, mds, closeFn, err := openStores(cctx)
+	bs, mds, closeFn, err := openStores(cctx, cctx.Bool("splitstore"))
 	if err != nil {
 		return fmt.Errorf("failed to openStores: %w", err)
 	}
@@ -446,11 +453,11 @@ func deleteTrace(filename string) error {
 	return os.Remove(filename)
 }
 
-func openStores(c *cli.Context) (blockstore.Blockstore, datastore.Batching, func() error, error) {
+func openStores(c *cli.Context, splitstore bool) (blockstore.Blockstore, datastore.Batching, func() error, error) {
 	var (
 		fsrepo *repo.FsRepo
 		lkrepo repo.LockedRepo
-		bs     blockstore.Blockstore
+		store  blockstore.Blockstore
 		err    error
 	)
 
@@ -462,9 +469,31 @@ func openStores(c *cli.Context) (blockstore.Blockstore, datastore.Batching, func
 		return nil, nil, nil, err
 	}
 
-	if bs, err = lkrepo.Blockstore(c.Context, repo.UniversalBlockstore); err != nil {
+	if store, err = lkrepo.Blockstore(c.Context, repo.UniversalBlockstore); err != nil {
 		_ = lkrepo.Close()
 		return nil, nil, nil, fmt.Errorf("failed to open blockstore: %w", err)
+	}
+
+	if splitstore {
+		path, err := lkrepo.SplitstorePath()
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to get splitstore dir: %w", err)
+		}
+
+		path = filepath.Join(path, "hot.badger")
+		if err := os.MkdirAll(path, 0755); err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to hot store: %w", err)
+		}
+
+		opts, err := repo.BadgerBlockstoreOptions(repo.HotBlockstore, path, lkrepo.Readonly())
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to get hotstore options: %w", err)
+		}
+
+		store, err = badgerbs.Open(opts)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to open hotstore: %w", err)
+		}
 	}
 
 	mds, err := lkrepo.Datastore(c.Context, "/metadata")
@@ -473,7 +502,7 @@ func openStores(c *cli.Context) (blockstore.Blockstore, datastore.Batching, func
 		return nil, nil, nil, err
 	}
 
-	return bs, mds, lkrepo.Close, nil
+	return store, mds, lkrepo.Close, nil
 }
 
 func setupDrand(ctx context.Context, cs *store.ChainStore) (beacon.Schedule, error) {
