@@ -18,6 +18,7 @@ import (
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/blockstore"
 	badgerbs "github.com/filecoin-project/lotus/blockstore/badger"
+	"github.com/filecoin-project/lotus/blockstore/splitstore"
 	"github.com/filecoin-project/lotus/build"
 	"github.com/filecoin-project/lotus/chain/beacon"
 	"github.com/filecoin-project/lotus/chain/beacon/drand"
@@ -27,6 +28,7 @@ import (
 	"github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/chain/vm"
+	"github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/impl/full"
 	"github.com/filecoin-project/lotus/node/repo"
 	"github.com/filecoin-project/lotus/storage/sealer/ffiwrapper"
@@ -126,15 +128,32 @@ func run(cctx *cli.Context) error {
 
 		omitReportingPreBump = cctx.Bool("omit-pre-gas-bump-reporting")
 		tracing              = cctx.Bool("traces")
+		repoPath             = cctx.String("repo")
 
 		ctx = cctx.Context
+		bs  blockstore.Blockstore
 	)
 
-	bs, mds, closeFn, err := openStores(cctx, cctx.Bool("splitstore"))
+	repo, err := instantiateRepo(repoPath)
 	if err != nil {
-		return fmt.Errorf("failed to openStores: %w", err)
+		return fmt.Errorf("failed to instantiate repo: %w", err)
 	}
-	defer closeFn() //nolint
+	defer repo.Close() //nolint
+
+	mds, err := repo.Datastore(cctx.Context, "/metadata")
+	if err != nil {
+		return fmt.Errorf("failed to open metadata store: %w", err)
+	}
+
+	storeOpener := openSimple
+	if cctx.Bool("splitstore") {
+		storeOpener = openSplitstore
+	}
+
+	bs, err = storeOpener(ctx, repo, mds)
+	if err != nil {
+		return fmt.Errorf("failed to open store: %w", err)
+	}
 
 	// Parameter: epoch
 	switch splt := strings.Split(cctx.String("epoch"), ".."); {
@@ -351,6 +370,19 @@ func run(cctx *cli.Context) error {
 	return nil
 }
 
+func instantiateRepo(path string) (repo.LockedRepo, error) {
+	fsrepo, err := repo.NewFS(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open repo: %w", err)
+	}
+
+	repo, err := fsrepo.Lock(repo.FullNode)
+	if err != nil {
+		return nil, fmt.Errorf("failed to lock repo: %w", err)
+	}
+	return repo, nil
+}
+
 func compareReceipts(ctx context.Context, cs *store.ChainStore, oldReceipts []*types.MessageReceipt, newReceiptsRoot cid.Cid, msgs []types.ChainMsg, tracing bool, traces []*api.InvocResult) ([]bool, string, error) {
 	var out strings.Builder
 
@@ -453,56 +485,60 @@ func deleteTrace(filename string) error {
 	return os.Remove(filename)
 }
 
-func openStores(c *cli.Context, splitstore bool) (blockstore.Blockstore, datastore.Batching, func() error, error) {
-	var (
-		fsrepo *repo.FsRepo
-		lkrepo repo.LockedRepo
-		store  blockstore.Blockstore
-		err    error
-	)
-
-	if fsrepo, err = repo.NewFS(c.String("repo")); err != nil {
-		return nil, nil, nil, err
-	}
-
-	if lkrepo, err = fsrepo.Lock(repo.FullNode); err != nil {
-		return nil, nil, nil, err
-	}
-
-	if store, err = lkrepo.Blockstore(c.Context, repo.UniversalBlockstore); err != nil {
-		_ = lkrepo.Close()
-		return nil, nil, nil, fmt.Errorf("failed to open blockstore: %w", err)
-	}
-
-	if splitstore {
-		path, err := lkrepo.SplitstorePath()
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to get splitstore dir: %w", err)
-		}
-
-		path = filepath.Join(path, "hot.badger")
-		if err := os.MkdirAll(path, 0755); err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to hot store: %w", err)
-		}
-
-		opts, err := repo.BadgerBlockstoreOptions(repo.HotBlockstore, path, lkrepo.Readonly())
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to get hotstore options: %w", err)
-		}
-
-		store, err = badgerbs.Open(opts)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to open hotstore: %w", err)
-		}
-	}
-
-	mds, err := lkrepo.Datastore(c.Context, "/metadata")
+func openSimple(ctx context.Context, lkrepo repo.LockedRepo, _ datastore.Batching) (blockstore.Blockstore, error) {
+	store, err := lkrepo.Blockstore(ctx, repo.UniversalBlockstore)
 	if err != nil {
-		_ = lkrepo.Close()
-		return nil, nil, nil, err
+		return nil, fmt.Errorf("failed to open blockstore: %w", err)
+	}
+	return store, nil
+}
+
+func openSplitstore(ctx context.Context, lkrepo repo.LockedRepo, mds datastore.Batching) (blockstore.Blockstore, error) {
+	cold, err := lkrepo.Blockstore(ctx, repo.UniversalBlockstore)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open cold store: %w", err)
 	}
 
-	return store, mds, lkrepo.Close, nil
+	path, err := lkrepo.SplitstorePath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get splitstore dir: %w", err)
+	}
+
+	path = filepath.Join(path, "hot.badger")
+	opts, err := repo.BadgerBlockstoreOptions(repo.HotBlockstore, path, lkrepo.Readonly())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get hotstore options: %w", err)
+	}
+
+	hot, err := badgerbs.Open(opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open hot store: %w", err)
+	}
+
+	c, err := lkrepo.Config()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get node config: %w", err)
+	}
+
+	cfg, ok := c.(*config.FullNode)
+	if !ok {
+		return nil, fmt.Errorf("invalid config type: %T", c)
+	}
+
+	config := &splitstore.Config{
+		MarkSetType:              cfg.Chainstore.Splitstore.MarkSetType,
+		DiscardColdBlocks:        cfg.Chainstore.Splitstore.ColdStoreType == "discard",
+		UniversalColdBlocks:      cfg.Chainstore.Splitstore.ColdStoreType == "universal",
+		HotStoreMessageRetention: cfg.Chainstore.Splitstore.HotStoreMessageRetention,
+		HotStoreFullGCFrequency:  cfg.Chainstore.Splitstore.HotStoreFullGCFrequency,
+	}
+
+	ss, err := splitstore.Open(path, mds, hot, cold, config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open splitstore: %w", err)
+	}
+
+	return ss, nil
 }
 
 func setupDrand(ctx context.Context, cs *store.ChainStore) (beacon.Schedule, error) {
