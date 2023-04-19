@@ -549,6 +549,12 @@ func setupDrand(ctx context.Context, cs *store.ChainStore) (beacon.Schedule, err
 
 	var shd beacon.Schedule
 	for _, dc := range build.DrandConfigSchedule() {
+		if len(dc.Config.Servers) == 0 {
+			// In Lotus, we would use the Gossipsub client for the incentinet phase of mainnet.
+			// However, we're not configuring Gossipsub here, so this would fail.
+			// We skip it since we don't expect to run those historical portions of the chain through lotus-rebase, ever.
+			continue
+		}
 		bc, err := drand.NewDrandBeacon(gen.Timestamp, build.BlockDelaySecs, nil, dc.Config)
 		if err != nil {
 			return nil, fmt.Errorf("creating drand beacon: %w", err)
