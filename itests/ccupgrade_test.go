@@ -73,6 +73,7 @@ func runTestCCUpgrade(t *testing.T) *kit.TestFullNode {
 	require.NoError(t, err)
 	require.NotNil(t, si)
 	require.Less(t, 50000, int(si.Expiration))
+	require.True(t, si.ReplacedSectorAge == 0)
 
 	client.WaitForSectorActive(ctx, t, CCUpgrade, maddr)
 
@@ -103,7 +104,7 @@ func runTestCCUpgrade(t *testing.T) *kit.TestFullNode {
 	siUpdate, err := client.StateSectorGetInfo(ctx, maddr, CCUpgrade, types.EmptyTSK)
 	require.NoError(t, err)
 	require.NotNil(t, siUpdate)
-	require.True(t, siUpdate.ReplacedSectorAge > 0)
+	require.True(t, siUpdate.SectorKeyCID != nil)
 	require.True(t, siUpdate.Activation > si.Activation)
 
 	return client
