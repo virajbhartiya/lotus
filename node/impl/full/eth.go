@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/ipfs/go-cid"
 	cbg "github.com/whyrusleeping/cbor-gen"
 	"github.com/zyedidia/generic/queue"
 	"go.uber.org/fx"
@@ -458,8 +457,57 @@ func (a *EthModule) EthGetTransactionReceiptLimited(ctx context.Context, txHash 
 	return &receipt, nil
 }
 
-func (a *EthAPI) EthGetTransactionByBlockHashAndIndex(context.Context, ethtypes.EthHash, ethtypes.EthUint64) (ethtypes.EthTx, error) {
-	return ethtypes.EthTx{}, ErrUnsupported
+func (a *EthAPI) EthGetTransactionByBlockHashAndIndex(ctx context.Context, blkHash ethtypes.EthHash, txIndex ethtypes.EthUint64) (ethtypes.EthTx, error) {
+	ts, err := a.Chain.GetTipSetByCid(ctx, blkHash.ToCid())
+	if err != nil {
+		return ethtypes.EthTx{}, xerrors.Errorf("error loading tipset %s: %w", ts, err)
+	}
+
+	bMsgs, err := a.Chain.BlockMsgsForTipset(ctx, ts)
+	if err != nil {
+		return ethtypes.EthTx{}, xerrors.Errorf("error loading messages for tipset %s: %w", ts, err)
+	}
+
+	searchIndex := uint64(txIndex)
+
+	for _, blkMsg := range bMsgs {
+		blkMsgLen := len(blkMsg.BlsMessages) + len(blkMsg.SecpkMessages)
+
+		// Message is inside this block
+		if searchIndex <= uint64(blkMsgLen-1) {
+			var msg types.ChainMsg
+			// Message is inside BlsMessages
+			if searchIndex <= uint64(len(blkMsg.BlsMessages))-1 {
+				msg = blkMsg.BlsMessages[searchIndex]
+			} else {
+				// Message is inside SecpkMessages
+				msg = blkMsg.SecpkMessages[searchIndex-uint64(len(blkMsg.BlsMessages))-1]
+			}
+
+			vmMessage := msg.VMMessage()
+
+			// Only interested in EVM messages
+			if vmMessage.From.Protocol() != address.Delegated {
+				smsg, err := getSignedMessage(ctx, a.Chain, msg.Cid())
+				if err != nil {
+					return ethtypes.EthTx{}, xerrors.Errorf("failed to load signed message: %w", err)
+				}
+
+				tx, err := ethtypes.EthTxFromSignedEthMessage(smsg)
+				if err != nil {
+					return ethtypes.EthTx{}, xerrors.Errorf("failed to convert signed message to Eth transaction: %w", err)
+				} else {
+					return tx, nil
+				}
+			} else {
+				return ethtypes.EthTx{}, nil
+			}
+		} else {
+			searchIndex -= uint64(blkMsgLen)
+		}
+	}
+
+	return ethtypes.EthTx{}, nil
 }
 
 func (a *EthAPI) EthGetTransactionByBlockNumberAndIndex(context.Context, ethtypes.EthUint64, ethtypes.EthUint64) (ethtypes.EthTx, error) {
