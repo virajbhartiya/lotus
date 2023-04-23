@@ -744,6 +744,7 @@ func createStorageMiner(ctx context.Context, api v1api.FullNode, ssize abi.Secto
 		GasPremium: gasPrice,
 	}
 
+	log.Errorf("sanity check: creating with pt %d", spt)
 	signed, err := api.MpoolPushMessage(ctx, createStorageMinerMsg, nil)
 	if err != nil {
 		return address.Undef, xerrors.Errorf("pushing createMiner message: %w", err)
