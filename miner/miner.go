@@ -492,6 +492,8 @@ func (m *Miner) mineOne(ctx context.Context, base *MiningBase) (minedBlock *type
 		return nil, nil
 	}
 
+	log.Errorf("getting base info: %v", time.Since(tStart))
+
 	tPowercheck := build.Clock.Now()
 
 	bvals := mbi.BeaconEntries
@@ -511,6 +513,8 @@ func (m *Miner) mineOne(ctx context.Context, base *MiningBase) (minedBlock *type
 		err = xerrors.Errorf("failed to check if we win next round: %w", err)
 		return nil, err
 	}
+
+	log.Errorf("determining winner: %v", time.Since(tPowercheck))
 
 	if winner == nil {
 		return nil, nil
@@ -544,6 +548,8 @@ func (m *Miner) mineOne(ctx context.Context, base *MiningBase) (minedBlock *type
 		return nil, err
 	}
 
+	log.Errorf("getting post: %v", time.Since(tTicket))
+
 	tProof := build.Clock.Now()
 
 	// get pending messages early,
@@ -553,6 +559,7 @@ func (m *Miner) mineOne(ctx context.Context, base *MiningBase) (minedBlock *type
 		return nil, err
 	}
 
+	log.Errorf("selecting messages: %v", time.Since(tProof))
 	tPending := build.Clock.Now()
 
 	// TODO: winning post proof
@@ -561,6 +568,8 @@ func (m *Miner) mineOne(ctx context.Context, base *MiningBase) (minedBlock *type
 		err = xerrors.Errorf("failed to create block: %w", err)
 		return nil, err
 	}
+
+	log.Errorf("creating block: %v", time.Since(tPending))
 
 	tCreateBlock := build.Clock.Now()
 	dur := tCreateBlock.Sub(tStart)

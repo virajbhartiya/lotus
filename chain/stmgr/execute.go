@@ -3,6 +3,7 @@ package stmgr
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	"go.opencensus.io/trace"
@@ -65,15 +66,20 @@ func (sm *StateManager) TipSetState(ctx context.Context, ts *types.TipSet) (st c
 
 	// First, try to find the tipset in the current chain. If found, we can avoid re-executing
 	// it.
+	stateCompStart := time.Now()
 	if st, rec, found := tryLookupTipsetState(ctx, sm.cs, ts); found {
+		log.Errorf("found state in chain, took %v", time.Since(stateCompStart))
 		return st, rec, nil
 	}
 
+	log.Errorf("checking state in chain (didn't find it) took %v", time.Since(stateCompStart))
+	stateCompMid := time.Now()
 	st, rec, err = sm.tsExec.ExecuteTipSet(ctx, sm, ts, sm.tsExecMonitor, false)
 	if err != nil {
 		return cid.Undef, cid.Undef, err
 	}
 
+	log.Errorf("computing state took %v", time.Since(stateCompMid))
 	return st, rec, nil
 }
 

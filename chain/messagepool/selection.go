@@ -40,6 +40,8 @@ type msgChain struct {
 }
 
 func (mp *MessagePool) SelectMessages(ctx context.Context, ts *types.TipSet, tq float64) ([]*types.SignedMessage, error) {
+	selectMessagesStart := time.Now()
+	defer log.Errorf("selecting messages took: %v", selectMessagesStart)
 	mp.curTsLk.Lock()
 	defer mp.curTsLk.Unlock()
 
