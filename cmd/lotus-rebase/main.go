@@ -301,9 +301,14 @@ func run(cctx *cli.Context) error {
 			return fmt.Errorf("failed to get block messages: %w", err)
 		}
 
+		parentTs, err := cs.GetTipSetFromKey(ctx, incTs.Parents())
+		if err != nil {
+			return fmt.Errorf("failed to get parent tipset of inclusion tipset: %w", err)
+		}
+
 		var traces []*api.InvocResult
 		tracer := stmgr.InvocationTracer{Trace: &traces}
-		_, postRecRoot, err := tse.ApplyBlocks(ctx, tmpSm, incTs.Height(), incTs.ParentState(), bmsgs, execTs.Height(), r, &tracer, true, baseFee, incTs)
+		_, postRecRoot, err := tse.ApplyBlocks(ctx, tmpSm, parentTs.Height(), incTs.ParentState(), bmsgs, incTs.Height(), r, &tracer, true, baseFee, incTs)
 		if err != nil {
 			return fmt.Errorf("failed to apply blocks: %w", err)
 		}
@@ -460,9 +465,15 @@ func compareReceipts(ctx context.Context, cs *store.ChainStore, oldReceipts []*t
 		}
 
 		if tracing && dumpTrace {
-			if err := writeTrace(msgs[i].Cid().String(), traces[i]); err != nil {
+			idx := slices.IndexFunc(traces, func(result *api.InvocResult) bool {
+				return result.MsgCid == msgs[i].Cid()
+			})
+			if idx == -1 {
+				out.WriteString(color.RedString("  failed to find trace"))
+			} else if err := writeTrace(msgs[i].Cid().String(), traces[idx]); err != nil {
 				out.WriteString(color.RedString("  failed to write trace: %s", err))
 			}
+			out.WriteString(color.RedString("    - ERROR MESSAGE: %s", traces[idx].Error) + "\n")
 		}
 	}
 
