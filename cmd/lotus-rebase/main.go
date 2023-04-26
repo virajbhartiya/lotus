@@ -280,9 +280,14 @@ func run(cctx *cli.Context) error {
 			return root, nil
 		}
 
+		parentTs, err := cs.GetTipSetFromKey(ctx, incTs.Parents())
+		if err != nil {
+			return fmt.Errorf("failed to get parent tipset of inclusion tipset: %w", err)
+		}
+
 		upSched := stmgr.UpgradeSchedule{
 			stmgr.Upgrade{
-				Height:        incTs.Height(),
+				Height:        parentTs.Height(),
 				Network:       nvTgt,
 				Migration:     aggMig,
 				PreMigrations: nil,
@@ -299,11 +304,6 @@ func run(cctx *cli.Context) error {
 		bmsgs, err := getBlockMessages(ctx, sm, incTs)
 		if err != nil {
 			return fmt.Errorf("failed to get block messages: %w", err)
-		}
-
-		parentTs, err := cs.GetTipSetFromKey(ctx, incTs.Parents())
-		if err != nil {
-			return fmt.Errorf("failed to get parent tipset of inclusion tipset: %w", err)
 		}
 
 		var traces []*api.InvocResult
