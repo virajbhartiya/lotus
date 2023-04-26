@@ -275,7 +275,16 @@ func defaultFVMOpts(ctx context.Context, opts *VMOpts) (*ffi.FVMOpts, error) {
 
 }
 
+func mytimer(name string) func() {
+	start := time.Now()
+	return func() {
+		fmt.Printf("%s took %s\n", name, time.Since(start))
+	}
+}
+
 func NewFVM(ctx context.Context, opts *VMOpts) (*FVM, error) {
+	defer mytimer("NewFVM")()
+
 	fvmOpts, err := defaultFVMOpts(ctx, opts)
 	if err != nil {
 		return nil, xerrors.Errorf("creating fvm opts: %w", err)

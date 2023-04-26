@@ -3,6 +3,8 @@ package full
 import (
 	"context"
 	"math"
+	"time"
+	"fmt"
 	"math/rand"
 	"os"
 	"sort"
@@ -268,7 +270,11 @@ func gasEstimateCallWithGas(
 		return nil, []types.ChainMsg{}, nil, xerrors.Errorf("getting key address: %w", err)
 	}
 
+	start := time.Now()
 	pending, ts := mpool.PendingFor(ctx, fromA)
+	elapsed := time.Since(start)
+	fmt.Printf("PendingFor took %s\n", elapsed)
+
 	priorMsgs := make([]types.ChainMsg, 0, len(pending))
 	for _, m := range pending {
 		if m.Message.Nonce == msg.Nonce {
@@ -285,11 +291,18 @@ func gasEstimateCallWithGas(
 	// Try calling until we find a height with no migration.
 	var res *api.InvocResult
 	for {
+		start = time.Now()
 		res, err = smgr.CallWithGas(ctx, &msg, priorMsgs, ts, applyTsMessages)
+			elapsed = time.Since(start)
+				fmt.Printf("CallWithGas took %s\n", elapsed)
+
 		if err != stmgr.ErrExpensiveFork {
 			break
 		}
+		start = time.Now()
 		ts, err = cstore.GetTipSetFromKey(ctx, ts.Parents())
+		elapsed = time.Since(start)
+		fmt.Printf("GetTipSetFromKey took %s\n", elapsed)
 		if err != nil {
 			return nil, []types.ChainMsg{}, nil, xerrors.Errorf("getting parent tipset: %w", err)
 		}

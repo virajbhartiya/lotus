@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"go.opencensus.io/trace"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	cbor "github.com/ipfs/go-ipld-cbor"
-	"go.opencensus.io/trace"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
@@ -26,6 +27,13 @@ import (
 )
 
 var ErrExpensiveFork = errors.New("refusing explicit call due to state fork at epoch")
+
+func tracer(name string) func() {
+	start := time.Now()
+	return func() {
+		fmt.Printf("%s took %s\n", name, time.Since(start))
+	}
+}
 
 // Call applies the given message to the given tipset's parent state, at the epoch following the
 // tipset's parent. In the presence of null blocks, the height at which the message is invoked may
@@ -81,6 +89,7 @@ func (sm *StateManager) callInternal(ctx context.Context, msg *types.Message, pr
 
 	var err error
 	var pts *types.TipSet
+	defer tracer("1")()
 	if ts == nil {
 		ts = sm.cs.GetHeaviestTipSet()
 
@@ -117,11 +126,13 @@ func (sm *StateManager) callInternal(ctx context.Context, msg *types.Message, pr
 	if stateCid == cid.Undef {
 		stateCid = ts.ParentState()
 	}
+	defer tracer("2")()
 	tsMsgs, err := sm.cs.MessagesForTipset(ctx, ts)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to lookup messages for parent tipset: %w", err)
 	}
 
+	defer tracer("MessagesForTipset")()
 	if applyTsMessages {
 		priorMsgs = append(tsMsgs, priorMsgs...)
 	} else {
@@ -134,12 +145,14 @@ func (sm *StateManager) callInternal(ctx context.Context, msg *types.Message, pr
 		}
 		priorMsgs = append(filteredTsMsgs, priorMsgs...)
 	}
+	defer tracer("4")()
 
 	// Technically, the tipset we're passing in here should be ts+1, but that may not exist.
 	stateCid, err = sm.HandleStateForks(ctx, stateCid, ts.Height(), nil, ts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to handle fork: %w", err)
 	}
+	defer tracer("5")()
 
 	if span.IsRecordingEvents() {
 		span.AddAttributes(
@@ -149,7 +162,9 @@ func (sm *StateManager) callInternal(ctx context.Context, msg *types.Message, pr
 		)
 	}
 
+	defer tracer("5")()
 	buffStore := blockstore.NewTieredBstore(sm.cs.StateBlockstore(), blockstore.NewMemorySync())
+	defer tracer("6")()
 	vmopt := &vm.VMOpts{
 		StateBase:      stateCid,
 		Epoch:          ts.Height(),
@@ -165,7 +180,9 @@ func (sm *StateManager) callInternal(ctx context.Context, msg *types.Message, pr
 		TipSetGetter:   TipSetGetterForTipset(sm.cs, ts),
 		Tracing:        true,
 	}
+	defer tracer("VMOpts")()
 	vmi, err := sm.newVM(ctx, vmopt)
+	defer tracer("newVM")()
 	if err != nil {
 		return nil, xerrors.Errorf("failed to set up vm: %w", err)
 	}
@@ -175,6 +192,7 @@ func (sm *StateManager) callInternal(ctx context.Context, msg *types.Message, pr
 			return nil, xerrors.Errorf("applying prior message (%d, %s): %w", i, m.Cid(), err)
 		}
 	}
+	defer tracer("ApplyMessage")()
 
 	// We flush to get the VM's view of the state tree after applying the above messages
 	// This is needed to get the correct nonce from the actor state to match the VM
@@ -183,6 +201,7 @@ func (sm *StateManager) callInternal(ctx context.Context, msg *types.Message, pr
 		return nil, xerrors.Errorf("flushing vm: %w", err)
 	}
 
+	defer tracer("9")()
 	stTree, err := state.LoadStateTree(cbor.NewCborStore(buffStore), stateCid)
 	if err != nil {
 		return nil, xerrors.Errorf("loading state tree: %w", err)
