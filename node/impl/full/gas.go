@@ -2,12 +2,12 @@ package full
 
 import (
 	"context"
-	"math"
-	"time"
 	"fmt"
+	"math"
 	"math/rand"
 	"os"
 	"sort"
+	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"go.uber.org/fx"
@@ -293,8 +293,8 @@ func gasEstimateCallWithGas(
 	for {
 		start = time.Now()
 		res, err = smgr.CallWithGas(ctx, &msg, priorMsgs, ts, applyTsMessages)
-			elapsed = time.Since(start)
-				fmt.Printf("CallWithGas took %s\n", elapsed)
+		elapsed = time.Since(start)
+		fmt.Printf("CallWithGas took %s\n", elapsed)
 
 		if err != stmgr.ErrExpensiveFork {
 			break

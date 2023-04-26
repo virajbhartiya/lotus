@@ -89,7 +89,8 @@ func (sm *StateManager) callInternal(ctx context.Context, msg *types.Message, pr
 
 	var err error
 	var pts *types.TipSet
-	defer tracer("1")()
+
+	start := time.Now()
 	if ts == nil {
 		ts = sm.cs.GetHeaviestTipSet()
 
@@ -119,6 +120,8 @@ func (sm *StateManager) callInternal(ctx context.Context, msg *types.Message, pr
 			return nil, ErrExpensiveFork
 		}
 	}
+	elapsed := time.Since(start)
+	fmt.Printf("GetTipset took %s\n", elapsed)
 
 	// Unless executing on a specific state cid, apply all the messages from the current tipset
 	// first. Unfortunately, we can't just execute the tipset, because that will run cron. We
@@ -126,13 +129,14 @@ func (sm *StateManager) callInternal(ctx context.Context, msg *types.Message, pr
 	if stateCid == cid.Undef {
 		stateCid = ts.ParentState()
 	}
-	defer tracer("2")()
+	start = time.Now()
 	tsMsgs, err := sm.cs.MessagesForTipset(ctx, ts)
+	elapsed = time.Since(start)
+	fmt.Printf("MessagesForTipset took %s\n", elapsed)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to lookup messages for parent tipset: %w", err)
 	}
 
-	defer tracer("MessagesForTipset")()
 	if applyTsMessages {
 		priorMsgs = append(tsMsgs, priorMsgs...)
 	} else {
@@ -145,14 +149,15 @@ func (sm *StateManager) callInternal(ctx context.Context, msg *types.Message, pr
 		}
 		priorMsgs = append(filteredTsMsgs, priorMsgs...)
 	}
-	defer tracer("4")()
+	start = time.Now()
 
 	// Technically, the tipset we're passing in here should be ts+1, but that may not exist.
 	stateCid, err = sm.HandleStateForks(ctx, stateCid, ts.Height(), nil, ts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to handle fork: %w", err)
 	}
-	defer tracer("5")()
+	elapsed = time.Since(start)
+	fmt.Printf("HandleStateForks took %s\n", elapsed)
 
 	if span.IsRecordingEvents() {
 		span.AddAttributes(
@@ -162,9 +167,8 @@ func (sm *StateManager) callInternal(ctx context.Context, msg *types.Message, pr
 		)
 	}
 
-	defer tracer("5")()
 	buffStore := blockstore.NewTieredBstore(sm.cs.StateBlockstore(), blockstore.NewMemorySync())
-	defer tracer("6")()
+	start = time.Now()
 	vmopt := &vm.VMOpts{
 		StateBase:      stateCid,
 		Epoch:          ts.Height(),
@@ -180,28 +184,35 @@ func (sm *StateManager) callInternal(ctx context.Context, msg *types.Message, pr
 		TipSetGetter:   TipSetGetterForTipset(sm.cs, ts),
 		Tracing:        true,
 	}
-	defer tracer("VMOpts")()
+	elapsed = time.Since(start)
+	fmt.Printf("VMOpts took %s\n", elapsed)
+	start = time.Now()
 	vmi, err := sm.newVM(ctx, vmopt)
-	defer tracer("newVM")()
+	elapsed = time.Since(start)
+	fmt.Printf("newVM took %s\n", elapsed)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to set up vm: %w", err)
 	}
+	start = time.Now()
 	for i, m := range priorMsgs {
 		_, err = vmi.ApplyMessage(ctx, m)
 		if err != nil {
 			return nil, xerrors.Errorf("applying prior message (%d, %s): %w", i, m.Cid(), err)
 		}
 	}
-	defer tracer("ApplyMessage")()
+	elapsed = time.Since(start)
+	fmt.Printf("ApplyMessage took %s\n", elapsed)
 
 	// We flush to get the VM's view of the state tree after applying the above messages
 	// This is needed to get the correct nonce from the actor state to match the VM
+	start = time.Now()
 	stateCid, err = vmi.Flush(ctx)
 	if err != nil {
 		return nil, xerrors.Errorf("flushing vm: %w", err)
 	}
+	elapsed = time.Since(start)
+	fmt.Printf("vmi.Flush took %s\n", elapsed)
 
-	defer tracer("9")()
 	stTree, err := state.LoadStateTree(cbor.NewCborStore(buffStore), stateCid)
 	if err != nil {
 		return nil, xerrors.Errorf("loading state tree: %w", err)
