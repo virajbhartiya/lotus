@@ -717,13 +717,10 @@ func (mp *MessagePool) Push(ctx context.Context, m *types.SignedMessage, publish
 		<-mp.addSema
 	}()
 
-	mp.curTsLk.Lock()
 	ok, err := mp.addTs(ctx, m, mp.curTs, true, false)
 	if err != nil {
-		mp.curTsLk.Unlock()
 		return cid.Undef, err
 	}
-	mp.curTsLk.Unlock()
 
 	if ok && publish {
 		msgb, err := m.Serialize()
@@ -794,21 +791,21 @@ func (mp *MessagePool) Add(ctx context.Context, m *types.SignedMessage) error {
 	_, _ = mp.api.GetActorAfter(m.Message.From, tmpCurTs)
 	_, _ = mp.getStateNonce(ctx, m.Message.From, tmpCurTs)
 
-	mp.curTsLk.Lock()
+	mp.curTsLk.RLock()
 	if tmpCurTs == mp.curTs {
 		//with the lock enabled, mp.curTs is the same Ts as we just had, so we know that our computations are cached
 	} else {
 		//curTs has been updated so we want to cache the new one:
 		tmpCurTs = mp.curTs
 		//we want to release the lock, cache the computations then grab it again
-		mp.curTsLk.Unlock()
+		mp.curTsLk.RUnlock()
 		_, _ = mp.api.GetActorAfter(m.Message.From, tmpCurTs)
 		_, _ = mp.getStateNonce(ctx, m.Message.From, tmpCurTs)
-		mp.curTsLk.Lock()
+		mp.curTsLk.RLock()
 		//now that we have the lock, we continue, we could do this as a loop forever, but that's bad to loop forever, and this was added as an optimization and it seems once is enough because the computation < block time
 	}
 
-	defer mp.curTsLk.Unlock()
+	mp.curTsLk.RUnlock()
 
 	_, err = mp.addTs(ctx, m, mp.curTs, false, false)
 	return err
@@ -922,6 +919,8 @@ func (mp *MessagePool) addTs(ctx context.Context, m *types.SignedMessage, curTs 
 		return false, xerrors.Errorf("failed to check balance: %w", err)
 	}
 
+	mp.curTsLk.Lock()
+	defer mp.curTsLk.Unlock()
 	err = mp.addLocked(ctx, m, !local, untrusted)
 	if err != nil {
 		return false, xerrors.Errorf("failed to add locked: %w", err)
@@ -1162,13 +1161,10 @@ func (mp *MessagePool) PushUntrusted(ctx context.Context, m *types.SignedMessage
 		<-mp.addSema
 	}()
 
-	mp.curTsLk.Lock()
 	publish, err := mp.addTs(ctx, m, mp.curTs, true, true)
 	if err != nil {
-		mp.curTsLk.Unlock()
 		return cid.Undef, err
 	}
-	mp.curTsLk.Unlock()
 
 	if publish {
 		msgb, err := m.Serialize()
