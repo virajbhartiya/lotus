@@ -9,6 +9,7 @@ import (
 	stdbig "math/big"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -340,6 +341,10 @@ func (ms *msgSet) rm(nonce uint64, applied bool) {
 	if nonce < ms.nextNonce {
 		ms.nextNonce = nonce
 	}
+}
+
+func (m *msgSet) getNextNonce() uint64 {
+	return atomic.LoadUint64(&m.nextNonce)
 }
 
 func (ms *msgSet) getRequiredFunds(nonce uint64) types.BigInt {
@@ -1067,15 +1072,16 @@ func (mp *MessagePool) getNonceLocked(ctx context.Context, addr address.Address,
 		log.Debugf("mpoolgetnonce failed to get mset: %s", err)
 		return 0, err
 	}
+	nextNonce := mset.getNextNonce()
 
 	if ok {
-		if stateNonce > mset.nextNonce {
-			log.Errorf("state nonce was larger than mset.nextNonce (%d > %d)", stateNonce, mset.nextNonce)
+		if stateNonce > nextNonce {
+			log.Errorf("state nonce was larger than mset.nextNonce (%d > %d)", stateNonce, nextNonce)
 
 			return stateNonce, nil
 		}
 
-		return mset.nextNonce, nil
+		return nextNonce, nil
 	}
 
 	return stateNonce, nil
