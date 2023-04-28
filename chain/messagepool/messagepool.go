@@ -1044,16 +1044,6 @@ func (mp *MessagePool) addLocked(ctx context.Context, m *types.SignedMessage, st
 	return nil
 }
 
-func (mp *MessagePool) GetNonce(ctx context.Context, addr address.Address, _ types.TipSetKey) (uint64, error) {
-	mp.curTsLk.RLock()
-	defer mp.curTsLk.RUnlock()
-
-	mp.lk.RLock()
-	defer mp.lk.RUnlock()
-
-	return mp.getNonceLocked(ctx, addr, mp.curTs)
-}
-
 // GetActor should not be used. It is only here to satisfy interface mess caused by lite node handling
 func (mp *MessagePool) GetActor(_ context.Context, addr address.Address, _ types.TipSetKey) (*types.Actor, error) {
 	mp.curTsLk.RLock()
@@ -1061,7 +1051,11 @@ func (mp *MessagePool) GetActor(_ context.Context, addr address.Address, _ types
 	return mp.api.GetActorAfter(addr, mp.curTs)
 }
 
-func (mp *MessagePool) getNonceLocked(ctx context.Context, addr address.Address, curTs *types.TipSet) (uint64, error) {
+func (mp *MessagePool) GetNonce(ctx context.Context, addr address.Address, _ types.TipSetKey) (uint64, error) {
+	mp.curTsLk.RLock()
+	curTs := mp.curTs
+	mp.curTsLk.RUnlock()
+
 	stateNonce, err := mp.getStateNonce(ctx, addr, curTs) // sanity check
 	if err != nil {
 		return 0, err
