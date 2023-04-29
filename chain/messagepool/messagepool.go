@@ -143,6 +143,8 @@ type MessagePool struct {
 	curTsLk sync.RWMutex // DO NOT LOCK INSIDE lk
 	curTs   *types.TipSet
 
+	addTsLk sync.RWMutex // Ensures only one caller of addTS() at a time
+
 	cfgLk sync.RWMutex
 	cfg   *types.MpoolConfig
 
@@ -881,6 +883,10 @@ func (mp *MessagePool) checkBalance(ctx context.Context, m *types.SignedMessage,
 }
 
 func (mp *MessagePool) addTs(ctx context.Context, m *types.SignedMessage, curTs *types.TipSet, local, untrusted bool) (bool, error) {
+	//ensures only one caller of addTs at a time
+	mp.addTsLk.Lock()
+	defer mp.addTsLk.Unlock()
+
 	done := metrics.Timer(ctx, metrics.MpoolAddTsDuration)
 	defer done()
 
