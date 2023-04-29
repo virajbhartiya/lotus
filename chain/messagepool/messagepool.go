@@ -1278,6 +1278,8 @@ func (mp *MessagePool) pendingFor(ctx context.Context, a address.Address) []*typ
 func (mp *MessagePool) HeadChange(ctx context.Context, revert []*types.TipSet, apply []*types.TipSet) error {
 	mp.curTsLk.Lock()
 	defer mp.curTsLk.Unlock()
+	mp.addTsLk.Lock()
+	defer mp.addTsLk.Unlock()
 
 	repubTrigger := false
 	rmsgs := make(map[address.Address]map[uint64]*types.SignedMessage)
