@@ -228,7 +228,7 @@ func (syncer *Syncer) InformNewHead(from peer.ID, fts *store.FullTipSet) bool {
 
 	// TODO: IMPORTANT(GARBAGE) this needs to be put in the 'temporary' side of
 	// the blockstore
-	if err := syncer.store.PersistTipset(ctx, fts.TipSet()); err != nil {
+	if err := syncer.store.PersistTipsets(ctx, []*types.TipSet{fts.TipSet()}); err != nil {
 		log.Warn("failed to persist incoming block header: ", err)
 		return false
 	}
@@ -775,6 +775,8 @@ loop:
 		if gap := int(blockSet[len(blockSet)-1].Height() - untilHeight); gap < window {
 			window = gap
 		}
+
+		log.Info("Get blocks: ", window)
 		blks, err := syncer.Exchange.GetBlocks(ctx, at, window)
 		if err != nil {
 			// Most likely our peers aren't fully synced yet, but forwarded
@@ -836,6 +838,7 @@ loop:
 
 	if base.IsChildOf(known) {
 		// common case: receiving blocks that are building on top of our best tipset
+		fmt.Println("returning because child ", base.Key(), base.Height(), known.Height())
 		return blockSet, nil
 	}
 
@@ -844,6 +847,7 @@ loop:
 		return nil, xerrors.Errorf("failed to load next local tipset: %w", err)
 	}
 	if base.IsChildOf(knownParent) {
+		fmt.Println("returning because childParent ", base.Key(), base.Height(), knownParent.Height())
 		// common case: receiving a block thats potentially part of the same tipset as our best block
 		return blockSet, nil
 	}
@@ -864,6 +868,7 @@ loop:
 
 	blockSet = append(blockSet, fork...)
 
+	fmt.Println("returning because fork ", base.Key(), base.Height(), known.Height())
 	return blockSet, nil
 }
 
@@ -1196,17 +1201,27 @@ func (syncer *Syncer) collectChain(ctx context.Context, ts *types.TipSet, hts *t
 		return xerrors.Errorf("collectChain synced %s, wanted to sync %s", headers[0].Cids(), ts.Cids())
 	}
 
+	fmt.Println("decided i'm done")
+	fmt.Println("start height: ", headers[0].Height())
+	fmt.Println("end height: ", headers[len(headers)-1].Height())
+
 	ss.SetStage(api.StagePersistHeaders)
 
 	// Write tipsets from oldest to newest.
-	for i := len(headers) - 1; i >= 0; i-- {
-		ts := headers[i]
-		if err := syncer.store.PersistTipset(ctx, ts); err != nil {
-			err = xerrors.Errorf("failed to persist synced tipset to the chainstore: %w", err)
-			ss.Error(err)
-			return err
-		}
+	if err := syncer.store.PersistTipsets(ctx, headers); err != nil {
+		err = xerrors.Errorf("failed to persist synced tipset to the chainstore: %w", err)
+		ss.Error(err)
+		return err
 	}
+	//for i := len(headers) - 1; i >= 0; i-- {
+	//	fmt.Println("spinning in this", i)
+	//	ts := headers[i]
+	//	if err := syncer.store.PersistTipset(ctx, ts); err != nil {
+	//		err = xerrors.Errorf("failed to persist synced tipset to the chainstore: %w", err)
+	//		ss.Error(err)
+	//		return err
+	//	}
+	//}
 
 	ss.SetStage(api.StageMessages)
 

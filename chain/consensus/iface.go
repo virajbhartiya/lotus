@@ -90,7 +90,7 @@ func ValidateBlockPubsub(ctx context.Context, cns Consensus, self bool, msg *pub
 	reject, err := cns.ValidateBlockHeader(ctx, blk.Header)
 	if err != nil {
 		if reject == "" {
-			log.Warn("ignoring block msg: ", err)
+			//log.Warn("ignoring block msg: ", err)
 			return pubsub.ValidationIgnore, reject
 		}
 		return pubsub.ValidationReject, reject

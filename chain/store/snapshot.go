@@ -123,17 +123,24 @@ func (cs *ChainStore) Import(ctx context.Context, r io.Reader) (*types.TipSet, e
 	}
 
 	ts := root
+	tssToPersist := make([]*types.TipSet, 0)
 	for i := 0; i < int(TipsetkeyBackfillRange); i++ {
-		err = cs.PersistTipset(ctx, ts)
-		if err != nil {
-			return nil, err
-		}
+		tssToPersist = append(tssToPersist, ts)
+		//// TODO: Batch this!
+		//err = cs.PersistTipsets(ctx, []*types.TipSet{ts})
+		//if err != nil {
+		//	return nil, err
+		//}
 		parentTsKey := ts.Parents()
 		ts, err = cs.LoadTipSet(ctx, parentTsKey)
 		if ts == nil || err != nil {
 			log.Warnf("Only able to load the last %d tipsets", i)
 			break
 		}
+	}
+
+	if err := cs.PersistTipsets(ctx, tssToPersist); err != nil {
+		return nil, xerrors.Errorf("failed to persist tipsets: %w", err)
 	}
 
 	return root, nil
