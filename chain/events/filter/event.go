@@ -3,6 +3,7 @@ package filter
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/filecoin-project/go-state-types/abi"
 	blockadt "github.com/filecoin-project/specs-actors/actors/util/adt"
 
+	"github.com/filecoin-project/lotus/chain/stmgr"
 	cstore "github.com/filecoin-project/lotus/chain/store"
 	"github.com/filecoin-project/lotus/chain/types"
 )
@@ -291,6 +293,7 @@ func (e *executedMessage) Events() []*types.Event {
 
 type EventFilterManager struct {
 	ChainStore       *cstore.ChainStore
+	StateManager     *stmgr.StateManager
 	AddressResolver  func(ctx context.Context, emitter abi.ActorID, ts *types.TipSet) (address.Address, bool)
 	MaxFilterResults int
 	EventIndex       *EventIndex
@@ -298,6 +301,86 @@ type EventFilterManager struct {
 	mu            sync.Mutex // guards mutations to filters
 	filters       map[types.FilterID]*EventFilter
 	currentHeight abi.ChainEpoch
+}
+
+/*func chainGetEvents(ctx context.Context, root cid.Cid) ([]types.Event, error) {
+	store := cbor.NewCborStore(a.ExposedBlockstore)
+	evtArr, err := amt4.LoadAMT(ctx, store, root, amt4.UseTreeBitWidth(types.EventAMTBitwidth))
+	if err != nil {
+		return nil, xerrors.Errorf("load events amt: %w", err)
+	}
+
+	ret := make([]types.Event, 0, evtArr.Len())
+	var evt types.Event
+	err = evtArr.ForEach(ctx, func(u uint64, deferred *cbg.Deferred) error {
+		if u > math.MaxInt {
+			return xerrors.Errorf("too many events")
+		}
+		if err := evt.UnmarshalCBOR(bytes.NewReader(deferred.Raw)); err != nil {
+			return err
+		}
+
+		ret = append(ret, evt)
+		return nil
+	})
+
+	return ret, err
+}*/
+
+func (m *EventFilterManager) BackfillEvents(ctx context.Context, chainApi ChainApi) error {
+	checkTs := m.ChainStore.GetHeaviestTipSet()
+
+	epochs := 10
+	for i := 0; i < epochs; i++ {
+		execTsk := checkTs.Parents()
+		execTs, err := m.ChainStore.GetTipSetFromKey(ctx, execTsk)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("backfilling events for height %d has %d blocks\n", checkTs.Height(), len(execTs.Blocks()))
+		for i, block := range execTs.Blocks() {
+			msgs, _, err := m.ChainStore.MessagesForBlock(ctx, block)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("block %d has %d messages\n", i, len(msgs))
+			stateCid, invokeResults, err := stmgr.ComputeState(ctx, m.StateManager, execTs.Height(), msgs, execTs)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("computed state for block %d\n", i)
+
+			if stateCid != checkTs.ParentState() {
+				fmt.Println("consensus mismatch found at height ", execTs.Height())
+			}
+
+			for _, ir := range invokeResults {
+				if ir.MsgRct.EventsRoot == nil {
+					continue
+				}
+
+				events, err := chainApi.chainGetEvents(ctx, *ir.MsgRct.EventsRoot)
+				if err != nil {
+					return err
+				}
+
+				for _, event := range events {
+					fmt.Printf("%d %d: event:%+v%+v\n", i, execTs.Height(), event)
+					for _, entry := range event.Entries {
+						fmt.Printf("    entry:%+v\n", entry)
+					}
+				}
+			}
+
+		}
+
+		checkTs = execTs
+	}
+
+	fmt.Println("backfilling events complete")
+
+	return nil
 }
 
 func (m *EventFilterManager) Apply(ctx context.Context, from, to *types.TipSet) error {

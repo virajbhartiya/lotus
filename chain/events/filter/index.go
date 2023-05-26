@@ -122,6 +122,10 @@ func NewEventIndex(path string) (*EventIndex, error) {
 	}, nil
 }
 
+func (ei *EventIndex) DB() *sql.DB {
+	return ei.db
+}
+
 func (ei *EventIndex) Close() error {
 	if ei.db == nil {
 		return nil

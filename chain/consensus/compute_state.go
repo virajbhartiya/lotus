@@ -74,6 +74,7 @@ type FilecoinBlockMessages struct {
 	WinCount int64
 }
 
+// Runs vmi
 func (t *TipSetExecutor) ApplyBlocks(ctx context.Context,
 	sm *stmgr.StateManager,
 	parentEpoch abi.ChainEpoch,

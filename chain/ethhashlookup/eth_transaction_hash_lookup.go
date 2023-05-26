@@ -149,6 +149,10 @@ func NewTransactionHashLookup(path string) (*EthTxHashLookup, error) {
 	}, nil
 }
 
+func (ei *EthTxHashLookup) DB() *sql.DB {
+	return ei.db
+}
+
 func (ei *EthTxHashLookup) Close() error {
 	if ei.db == nil {
 		return nil

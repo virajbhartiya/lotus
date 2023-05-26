@@ -103,7 +103,7 @@ func DefaultFullNode() *FullNode {
 		},
 		Cluster: *DefaultUserRaftConfig(),
 		Fevm: FevmConfig{
-			EnableEthRPC:                 false,
+			EnableEthRPC:                 true,
 			EthTxHashMappingLifetimeDays: 0,
 			Events: Events{
 				DisableRealTimeFilterAPI: false,
@@ -113,6 +113,9 @@ func DefaultFullNode() *FullNode {
 				MaxFilterResults:         10000,
 				MaxFilterHeightRange:     2880, // conservative limit of one day
 			},
+		},
+		Index: IndexConfig{
+			EnableMsgIndex: true,
 		},
 	}
 }
