@@ -5,6 +5,7 @@ import (
 	"hash/maphash"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/puzpuzpuz/xsync/v2"
 	"golang.org/x/xerrors"
@@ -68,8 +69,18 @@ func (ci *ChainIndex) GetTipsetByHeight(ctx context.Context, from *types.TipSet,
 		return nil, xerrors.Errorf("failed to round down: %w", err)
 	}
 
+	traversals := 0
+	hits := 0
+	start := time.Now()
+
+	defer func() {
+		log.Infof("GetTipsetByHeight to epoch %d took %s, traversals: %d, hits: %d", to, time.Since(start), traversals, hits)
+	}()
+
 	cur := rounded.Key()
 	for {
+		traversals += 1
+
 		lbe, ok := ci.indexCache.Load(cur) // check the cache
 		if !ok {
 			lk := ci.fillCacheLock.GetLock(cur)
@@ -85,6 +96,8 @@ func (ci *ChainIndex) GetTipsetByHeight(ctx context.Context, from *types.TipSet,
 				ci.indexCache.Store(cur, lbe)
 			}
 			lk.Unlock()
+		} else {
+			hits += 1
 		}
 
 		if to == lbe.targetHeight {
@@ -113,6 +126,11 @@ func (ci *ChainIndex) GetTipsetByHeightWithoutCache(ctx context.Context, from *t
 
 // Caller must hold indexCacheLk
 func (ci *ChainIndex) fillCache(ctx context.Context, tsk types.TipSetKey) (*lbEntry, error) {
+	/*start := time.Now()
+	defer func() {
+		log.Infof("fillCache took %s", time.Since(start))
+	}()*/
+
 	ts, err := ci.loadTipSet(ctx, tsk)
 	if err != nil {
 		return nil, xerrors.Errorf("failed to load tipset: %w", err)

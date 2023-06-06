@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ipfs/go-cid"
 	"golang.org/x/xerrors"
@@ -138,25 +139,46 @@ func (sm *StateManager) WaitForMessage(ctx context.Context, mcid cid.Cid, confid
 }
 
 func (sm *StateManager) SearchForMessage(ctx context.Context, head *types.TipSet, mcid cid.Cid, lookbackLimit abi.ChainEpoch, allowReplaced bool) (*types.TipSet, *types.MessageReceipt, cid.Cid, error) {
+	start := time.Now()
+	var d1 time.Duration
+	var d2 time.Duration
+	found2 := false
+	var err2 error
+	debug := ""
+
+	defer func() {
+		log.Infof("SearchForMessage done in %s: (d1:%s, d2:%s), found:%t, debug:%s, err:%v ", time.Since(start), d1, d2, found2, debug, err2)
+	}()
+
 	msg, err := sm.cs.GetCMessage(ctx, mcid)
+	err2 = err
 	if err != nil {
+		debug = "1"
 		return nil, nil, cid.Undef, fmt.Errorf("failed to load message: %w", err)
 	}
 
 	r, foundMsg, err := sm.tipsetExecutedMessage(ctx, head, mcid, msg.VMMessage(), allowReplaced)
+	err2 = err
 	if err != nil {
+		debug = "2"
 		return nil, nil, cid.Undef, err
 	}
 
 	if r != nil {
+		debug = "3"
 		return head, r, foundMsg, nil
 	}
 
+	t1 := time.Now()
 	fts, r, foundMsg, err := sm.searchForIndexedMsg(ctx, mcid, msg)
+	d1 = time.Since(t1)
+	err2 = err
+	found2 = foundMsg.Defined()
 
 	switch {
 	case err == nil:
 		if r != nil && foundMsg.Defined() {
+			debug = "4"
 			return fts, r, foundMsg, nil
 		}
 
@@ -175,17 +197,23 @@ func (sm *StateManager) SearchForMessage(ctx context.Context, head *types.TipSet
 		log.Warnf("error searching message index: %s", err)
 	}
 
+	t2 := time.Now()
 	fts, r, foundMsg, err = sm.searchBackForMsg(ctx, head, msg, lookbackLimit, allowReplaced)
+	err2 = err
+	d2 = time.Since(t2)
+	found2 = foundMsg.Defined()
 
 	if err != nil {
+		debug = "5"
 		log.Warnf("failed to look back through chain for message %s", mcid)
 		return nil, nil, cid.Undef, err
 	}
 
 	if fts == nil {
+		debug = "6"
 		return nil, nil, cid.Undef, nil
 	}
-
+	debug = "9"
 	return fts, r, foundMsg, nil
 }
 
