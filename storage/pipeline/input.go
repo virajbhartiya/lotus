@@ -609,21 +609,21 @@ func (m *Sealing) updateInput(ctx context.Context, sp abi.RegisteredSealProof) e
 	return nil
 }
 
-// pendingPieceIndex is an index in the Sealing.pendingPieces map
-type pendingPieceIndex cid.Cid
+// PendingPieceIndex is an index in the Sealing.pendingPieces map
+type PendingPieceIndex cid.Cid
 
 type pieceBound struct {
-	epoch abi.ChainEpoch
+	Epoch abi.ChainEpoch
 
 	// boundStart marks deal /end/ epoch; only deals with boundStart lower or equal to expiration of a given sector can be
 	// put into that sector
-	boundStart []pendingPieceIndex
+	BoundStart []PendingPieceIndex
 
 	// boundEnd marks deal claim TermMax; only deals with boundEnd higher or equal to expiration of a given sector can be
 	// put into that sector
-	boundEnd []pendingPieceIndex
+	BoundEnd []PendingPieceIndex
 
-	dealBytesInBound abi.UnpaddedPieceSize
+	DealBytesInBound abi.UnpaddedPieceSize
 }
 
 func (m *Sealing) pendingPieceEpochBounds() []pieceBound {
@@ -633,18 +633,18 @@ func (m *Sealing) pendingPieceEpochBounds() []pieceBound {
 		// start bound on deal end
 		if boundsByEpoch[piece.deal.DealProposal.EndEpoch] == nil {
 			boundsByEpoch[piece.deal.DealProposal.EndEpoch] = &pieceBound{
-				epoch: piece.deal.DealProposal.EndEpoch,
+				Epoch: piece.deal.DealProposal.EndEpoch,
 			}
 		}
-		boundsByEpoch[piece.deal.DealProposal.EndEpoch].boundStart = append(boundsByEpoch[piece.deal.DealProposal.EndEpoch].boundStart, pendingPieceIndex(ppi))
+		boundsByEpoch[piece.deal.DealProposal.EndEpoch].BoundStart = append(boundsByEpoch[piece.deal.DealProposal.EndEpoch].BoundStart, PendingPieceIndex(ppi))
 
 		// end bound on term max
 		if boundsByEpoch[piece.claimTerms.claimTermEnd] == nil {
 			boundsByEpoch[piece.claimTerms.claimTermEnd] = &pieceBound{
-				epoch: piece.claimTerms.claimTermEnd,
+				Epoch: piece.claimTerms.claimTermEnd,
 			}
 		}
-		boundsByEpoch[piece.claimTerms.claimTermEnd].boundEnd = append(boundsByEpoch[piece.claimTerms.claimTermEnd].boundEnd, pendingPieceIndex(ppi))
+		boundsByEpoch[piece.claimTerms.claimTermEnd].BoundEnd = append(boundsByEpoch[piece.claimTerms.claimTermEnd].BoundEnd, PendingPieceIndex(ppi))
 	}
 
 	out := make([]pieceBound, 0, len(boundsByEpoch))
@@ -653,19 +653,19 @@ func (m *Sealing) pendingPieceEpochBounds() []pieceBound {
 	}
 
 	sort.Slice(out, func(i, j int) bool {
-		return out[i].epoch < out[j].epoch
+		return out[i].Epoch < out[j].Epoch
 	})
 
 	var curBoundBytes abi.UnpaddedPieceSize
 	for i, bound := range out {
-		for _, ppi := range bound.boundStart {
+		for _, ppi := range bound.BoundStart {
 			curBoundBytes += m.pendingPieces[cid.Cid(ppi)].size
 		}
-		for _, ppi := range bound.boundEnd {
+		for _, ppi := range bound.BoundEnd {
 			curBoundBytes -= m.pendingPieces[cid.Cid(ppi)].size
 		}
 
-		out[i].dealBytesInBound = curBoundBytes
+		out[i].DealBytesInBound = curBoundBytes
 	}
 
 	return out
@@ -692,7 +692,7 @@ func (m *Sealing) maybeUpgradeSector(ctx context.Context, sp abi.RegisteredSealP
 			return nil
 		}
 		f := sort.Search(len(pieceBounds), func(i int) bool {
-			return sectorExp <= pieceBounds[i].epoch
+			return sectorExp <= pieceBounds[i].Epoch
 		})
 		if f == 0 {
 			// all piece bounds are after sector expiration
@@ -740,7 +740,7 @@ func (m *Sealing) maybeUpgradeSector(ctx context.Context, sp abi.RegisteredSealP
 			continue
 		}
 
-		if pb.dealBytesInBound.Padded() == 0 {
+		if pb.DealBytesInBound.Padded() == 0 {
 			log.Debugw("skipping available sector", "sector", s.Number, "reason", "no deals in expiration bounds", "expiration", expirationEpoch)
 			continue
 		}
@@ -748,8 +748,8 @@ func (m *Sealing) maybeUpgradeSector(ctx context.Context, sp abi.RegisteredSealP
 		// if the sector has less than one sector worth of candidate deals, and
 		// the best candidate has more candidate deals, this sector isn't better
 
-		lessThanSectorOfData := pb.dealBytesInBound.Padded() < abi.PaddedPieceSize(ssize)
-		moreDealsThanBest := pb.dealBytesInBound.Padded() > bestDealBytes
+		lessThanSectorOfData := pb.DealBytesInBound.Padded() < abi.PaddedPieceSize(ssize)
+		moreDealsThanBest := pb.DealBytesInBound.Padded() > bestDealBytes
 
 		// we want lower pledge, but only if we have more than one sector worth of deals
 
@@ -761,7 +761,7 @@ func (m *Sealing) maybeUpgradeSector(ctx context.Context, sp abi.RegisteredSealP
 		if prefer && slowChecks(s.Number) {
 			bestExpiration = expirationEpoch
 			bestPledge = pledge
-			bestDealBytes = pb.dealBytesInBound.Padded()
+			bestDealBytes = pb.DealBytesInBound.Padded()
 			candidate = s
 		}
 	}
