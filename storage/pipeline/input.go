@@ -708,6 +708,8 @@ func (m *Sealing) maybeUpgradeSector(ctx context.Context, sp abi.RegisteredSealP
 	var bestDealBytes abi.PaddedPieceSize
 	bestPledge := types.TotalFilecoinInt
 
+	log.Debugw("maybeUpgradeSector", "available", len(m.available), "pieceBounds", pieceBounds, "minExpirationEpoch", minExpirationEpoch)
+
 	for s := range m.available {
 		expirationEpoch, pledge, err := ef(s.Number)
 		if err != nil {
