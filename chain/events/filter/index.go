@@ -163,6 +163,7 @@ func (ei *EventIndex) migrateToVersion2(ctx context.Context, chainStore *store.C
 		if err != nil {
 			return xerrors.Errorf("get tipset from key: %w", err)
 		}
+		fmt.Println("Migrating height %d", currTs.Height())
 		log.Debugf("Migrating height %d\n", currTs.Height())
 
 		tsKeyCid, err := currTs.Key().Cid()
