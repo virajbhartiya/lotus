@@ -101,9 +101,13 @@ func (m *Sealing) maybeStartSealing(ctx statemachine.Context, sector SectorInfo,
 	st := m.sectorTimers[m.minerSectorID(sector.SectorNumber)]
 	if st != nil {
 		if !st.Stop() { // timer expired, SectorStartPacking was/is being sent
-			// we send another SectorStartPacking in case one was sent in the handleAddPiece state
-			log.Infow("starting to seal deal sector", "trigger", "wait-timeout")
-			return true, ctx.Send(SectorStartPacking{})
+			// only go to packing if we have deals; we can have a timer in case
+			// AddPiece has failed before. If this is a CC update, we'll abort in Packing
+			if sector.hasDeals() || sector.CCUpdate {
+				// we send another SectorStartPacking in case one was sent in the handleAddPiece state
+				log.Infow("starting to seal deal sector", "trigger", "wait-timeout")
+				return true, ctx.Send(SectorStartPacking{})
+			}
 		}
 	}
 
@@ -170,7 +174,7 @@ func (m *Sealing) maybeStartSealing(ctx statemachine.Context, sector SectorInfo,
 			sealTime = dealSafeSealTime
 		}
 
-		if now.After(sealTime) {
+		if now.After(sealTime) && (sector.hasDeals() || sector.CCUpdate) {
 			log.Infow("starting to seal deal sector", "trigger", "wait-timeout", "creation", sector.CreationTime)
 			return true, ctx.Send(SectorStartPacking{})
 		}
