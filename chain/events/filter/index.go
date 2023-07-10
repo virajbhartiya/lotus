@@ -163,7 +163,8 @@ func (ei *EventIndex) migrateToVersion2(ctx context.Context, chainStore *store.C
 		if err != nil {
 			return xerrors.Errorf("get tipset from key: %w", err)
 		}
-		log.Debugf("Migrating height %d\n", currTs.Height())
+		log.Infof("Migrating height %d\n", currTs.Height())
+		start := time.Now()
 
 		tsKeyCid, err := currTs.Key().Cid()
 		if err != nil {
@@ -176,9 +177,13 @@ func (ei *EventIndex) migrateToVersion2(ctx context.Context, chainStore *store.C
 			return xerrors.Errorf("delete off chain event: %w", err)
 		}
 
+		log.Infof("delete time: %v", time.Since(start))
+		delTime := time.Now()
 		// find the first eventId from the last time the tipset was applied
 		var eventId sql.NullInt64
 		err = stmtSelectEvent.QueryRow(tsKeyCid.Bytes()).Scan(&eventId)
+		log.Infof("select time: %v", time.Since(delTime))
+
 		if err != nil {
 			if err == sql.ErrNoRows {
 				continue
@@ -186,22 +191,25 @@ func (ei *EventIndex) migrateToVersion2(ctx context.Context, chainStore *store.C
 			return xerrors.Errorf("select event: %w", err)
 		}
 
+		selectTime := time.Now()
 		// this tipset might not have any events which is ok
 		if !eventId.Valid {
 			continue
 		}
-		log.Debugf("Deleting all events with id < %d at height %d\n", eventId.Int64, currTs.Height())
+		log.Infof("Deleting all events with id < %d at height %d\n", eventId.Int64, currTs.Height())
 
 		res, err := stmtDeleteEvent.Exec(tsKeyCid.Bytes(), eventId.Int64)
 		if err != nil {
 			return xerrors.Errorf("delete event: %w", err)
 		}
 
+		log.Infof("delete2 time: %v", time.Since(selectTime))
+
 		nrRowsAffected, err := res.RowsAffected()
 		if err != nil {
 			return xerrors.Errorf("rows affected: %w", err)
 		}
-		log.Debugf("deleted %d events from tipset %s\n", nrRowsAffected, tsKeyCid.String())
+		log.Infof("deleted %d events from tipset %s\n", nrRowsAffected, tsKeyCid.String())
 	}
 
 	// delete all entries that have an event_id that doesn't exist (since we don't have a foreign
@@ -228,9 +236,15 @@ func (ei *EventIndex) migrateToVersion2(ctx context.Context, chainStore *store.C
 }
 
 func NewEventIndex(ctx context.Context, path string, chainStore *store.ChainStore) (*EventIndex, error) {
+	fmt.Println("opening ", path)
 	db, err := sql.Open("sqlite3", path+"?mode=rwc")
 	if err != nil {
 		return nil, xerrors.Errorf("open sqlite3 database: %w", err)
+	}
+
+	err = db.Ping()
+	if err != nil {
+		return nil, xerrors.Errorf("ping fail: %w", err)
 	}
 
 	for _, pragma := range pragmas {

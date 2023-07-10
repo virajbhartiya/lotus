@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/filecoin-project/lotus/chain/events/filter"
+
 	"github.com/urfave/cli/v2"
 
 	"github.com/filecoin-project/go-state-types/abi"
@@ -25,6 +27,7 @@ var ethCmd = &cli.Command{
 	Subcommands: []*cli.Command{
 		checkTipsetsCmd,
 		computeEthHashCmd,
+		eventsMigrationCmd,
 	},
 }
 
@@ -103,5 +106,27 @@ var computeEthHashCmd = &cli.Command{
 		}
 
 		return nil
+	},
+}
+
+var eventsMigrationCmd = &cli.Command{
+	Name:  "migrate-events",
+	Usage: "calculates the size of any DAG in the blockstore",
+	Flags: []cli.Flag{},
+	Action: func(cctx *cli.Context) error {
+		ctx := lcli.ReqContext(cctx)
+
+		h, err := loadChainStore(ctx, cctx.String("repo"))
+		if err != nil {
+			return fmt.Errorf("failed to load chain store: %w", err)
+		}
+		defer h.closer()
+
+		ei, err := filter.NewEventIndex(ctx, "/home/aayush/.lotus/sqlite/events.db", h.cs)
+		if err != nil {
+			return err
+		}
+
+		return ei.Close()
 	},
 }

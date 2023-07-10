@@ -5,11 +5,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
+	"os"
 	"path"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"sync"
+
+	badgerbs "github.com/filecoin-project/lotus/blockstore/badger"
+	"github.com/filecoin-project/lotus/blockstore/splitstore"
 
 	"github.com/docker/go-units"
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -231,26 +235,67 @@ func loadChainStore(ctx context.Context, repoPath string) (*StoreHandle, error) 
 	if err != nil {
 		return nil, err
 	}
+	//
+	//bs, err := lr.Blockstore(ctx, repo.UniversalBlockstore)
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed to open blockstore: %w", err)
+	//}
 
-	bs, err := lr.Blockstore(ctx, repo.UniversalBlockstore)
+	cold, err := lr.Blockstore(ctx, repo.UniversalBlockstore)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open blockstore: %w", err)
+		return nil, fmt.Errorf("failed to open universal blockstore %w", err)
 	}
 
-	closer := func() {
-		if err := lr.Close(); err != nil {
-			log.Warnf("failed to close locked repo: %s", err)
-		}
-		if c, ok := bs.(io.Closer); ok {
-			if err := c.Close(); err != nil {
-				log.Warnf("failed to close blockstore: %s", err)
-			}
-		}
+	ssPath, err := lr.SplitstorePath()
+	if err != nil {
+		return nil, err
+	}
+
+	ssPath = filepath.Join(ssPath, "hot.badger")
+	if err := os.MkdirAll(ssPath, 0755); err != nil {
+		return nil, err
+	}
+
+	opts, err := repo.BadgerBlockstoreOptions(repo.HotBlockstore, ssPath, lr.Readonly())
+	if err != nil {
+		return nil, err
+	}
+
+	hot, err := badgerbs.Open(opts)
+	if err != nil {
+		return nil, err
 	}
 
 	mds, err := lr.Datastore(context.Background(), "/metadata")
 	if err != nil {
 		return nil, err
+	}
+
+	cfg := &splitstore.Config{
+		MarkSetType:       "map",
+		DiscardColdBlocks: true,
+	}
+	ss, err := splitstore.Open(ssPath, mds, hot, cold, cfg)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := ss.Close(); err != nil {
+			log.Warnf("failed to close blockstore: %s", err)
+
+		}
+	}()
+
+	bs := ss
+
+	closer := func() {
+		if err := lr.Close(); err != nil {
+			log.Warnf("failed to close locked repo: %s", err)
+		}
+		if err := ss.Close(); err != nil {
+			log.Warnf("failed to close blockstore: %s", err)
+		}
+
 	}
 
 	cs := store.NewChainStore(bs, bs, mds, nil, nil)
