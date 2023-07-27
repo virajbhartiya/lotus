@@ -477,7 +477,7 @@ func (cg *ChainGen) NextTipSetFromMinersWithMessagesAndNulls(base *types.TipSet,
 
 	fts := store.NewFullTipSet(blks)
 	if err := cg.cs.PutTipSet(context.TODO(), fts.TipSet()); err != nil {
-		return nil, err
+		return nil, xerrors.Errorf("failed to put tipset: %w", err)
 	}
 
 	cg.CurTipset = fts

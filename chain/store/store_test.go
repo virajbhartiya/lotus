@@ -7,6 +7,8 @@ import (
 	"io"
 	"testing"
 
+	"github.com/filecoin-project/go-address"
+
 	"github.com/ipfs/go-datastore"
 	"github.com/stretchr/testify/require"
 
@@ -237,4 +239,124 @@ func TestChainExportImportFull(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+}
+
+func TestExpandTipsetPurgesDuplicates(t *testing.T) {
+	cg, err := gen.NewGenerator()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var last *types.TipSet
+	for i := 0; i < 10; i++ {
+		ts, err := cg.NextTipSet()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		last = ts.TipSet.TipSet()
+	}
+
+	require.NotEmpty(t, last.Blocks())
+	oldBlk := last.Blocks()[0]
+	dupBlk := *oldBlk
+	dupBlk.Timestamp = dupBlk.Timestamp + 1
+	addBlockToTracker(t, cg.ChainStore(), &dupBlk)
+
+	expandedTipset, err := cg.ChainStore().ExpandTipsetByHeightAndParent(context.TODO(), dupBlk.Height, dupBlk.Parents)
+	require.NoError(t, err)
+
+	require.NotContains(t, expandedTipset.Cids(), oldBlk.Cid())
+	require.NotContains(t, expandedTipset.Cids(), dupBlk.Cid())
+}
+
+func TestFormTipsetByHeight(t *testing.T) {
+	ctx := context.Background()
+	cg, err := gen.NewGenerator()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var last *types.TipSet
+	for i := 0; i < 10; i++ {
+		ts, err := cg.NextTipSet()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		last = ts.TipSet.TipSet()
+	}
+
+	require.NotEmpty(t, last.Blocks())
+	blk1 := *last.Blocks()[0]
+
+	// quick check: asking to form tipset at latest height just returns head
+	bestHead, bestHeadWeight, err := cg.ChainStore().FormBestTipSetForHeight(ctx, last.Height())
+	require.NoError(t, err)
+	require.Equal(t, last.Key(), bestHead.Key())
+	require.Contains(t, last.Cids(), blk1.Cid())
+	expectedWeight, err := cg.ChainStore().Weight(ctx, bestHead)
+	require.NoError(t, err)
+	require.Equal(t, expectedWeight, bestHeadWeight)
+
+	// add another block by a different miner -- it should get included in the best tipset
+	blk2 := blk1
+	blk1Miner, err := address.IDFromAddress(blk2.Miner)
+	require.NoError(t, err)
+	blk2.Miner, err = address.NewIDAddress(blk1Miner + 50)
+	require.NoError(t, err)
+	addBlockToTracker(t, cg.ChainStore(), &blk2)
+
+	bestHead, bestHeadWeight, err = cg.ChainStore().FormBestTipSetForHeight(ctx, last.Height())
+	require.NoError(t, err)
+	for _, blkCid := range last.Cids() {
+		require.Contains(t, bestHead.Cids(), blkCid)
+	}
+	require.Contains(t, bestHead.Cids(), blk2.Cid())
+	expectedWeight, err = cg.ChainStore().Weight(ctx, bestHead)
+	require.NoError(t, err)
+	require.Equal(t, expectedWeight, bestHeadWeight)
+
+	// add another block by a different miner, but on a different tipset -- it should NOT get included
+	blk3 := blk1
+	blk3.Miner, err = address.NewIDAddress(blk1Miner + 100)
+	require.NoError(t, err)
+	blk3.Parents = append(blk3.Parents, blk1.Cid())
+	addBlockToTracker(t, cg.ChainStore(), &blk3)
+
+	bestHead, bestHeadWeight, err = cg.ChainStore().FormBestTipSetForHeight(ctx, last.Height())
+	require.NoError(t, err)
+	for _, blkCid := range last.Cids() {
+		require.Contains(t, bestHead.Cids(), blkCid)
+	}
+	require.Contains(t, bestHead.Cids(), blk2.Cid())
+	require.NotContains(t, bestHead.Cids(), blk3.Cid())
+	expectedWeight, err = cg.ChainStore().Weight(ctx, bestHead)
+	require.NoError(t, err)
+	require.Equal(t, expectedWeight, bestHeadWeight)
+
+	// add another block by the same miner as blk1 -- it should NOT get included, and blk1 should be excluded too
+	blk4 := blk1
+	blk4.Timestamp = blk1.Timestamp + 1
+	addBlockToTracker(t, cg.ChainStore(), &blk4)
+
+	bestHead, bestHeadWeight, err = cg.ChainStore().FormBestTipSetForHeight(ctx, last.Height())
+	require.NoError(t, err)
+	for _, blkCid := range last.Cids() {
+		if blkCid != blk1.Cid() {
+			require.Contains(t, bestHead.Cids(), blkCid)
+		}
+	}
+	require.NotContains(t, bestHead.Cids(), blk4.Cid())
+	require.NotContains(t, bestHead.Cids(), blk1.Cid())
+	expectedWeight, err = cg.ChainStore().Weight(ctx, bestHead)
+	require.NoError(t, err)
+	require.Equal(t, expectedWeight, bestHeadWeight)
+}
+
+func addBlockToTracker(t *testing.T, cs *store.ChainStore, blk *types.BlockHeader) {
+	blk2Ts, err := types.NewTipSet([]*types.BlockHeader{blk})
+	require.NoError(t, err)
+	require.NoError(t, cs.PersistTipsets(context.TODO(), []*types.TipSet{blk2Ts}))
+	require.NoError(t, cs.AddToTipSetTracker(context.TODO(), blk))
 }
