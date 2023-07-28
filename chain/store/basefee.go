@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 
-	"github.com/ipfs/go-cid"
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-state-types/abi"
@@ -57,28 +56,15 @@ func (cs *ChainStore) ComputeBaseFee(ctx context.Context, ts *types.TipSet) (abi
 	// totalLimit is sum of GasLimits of unique messages in a tipset
 	totalLimit := int64(0)
 
-	seen := make(map[cid.Cid]struct{})
-
-	for _, b := range ts.Blocks() {
-		msg1, msg2, err := cs.MessagesForBlock(ctx, b)
-		if err != nil {
-			return zero, xerrors.Errorf("error getting messages for: %s: %w", b.Cid(), err)
-		}
-		for _, m := range msg1 {
-			c := m.Cid()
-			if _, ok := seen[c]; !ok {
-				totalLimit += m.GasLimit
-				seen[c] = struct{}{}
-			}
-		}
-		for _, m := range msg2 {
-			c := m.Cid()
-			if _, ok := seen[c]; !ok {
-				totalLimit += m.Message.GasLimit
-				seen[c] = struct{}{}
-			}
-		}
+	msgs, err := cs.MessagesForTipset(ctx, ts)
+	if err != nil {
+		return zero, xerrors.Errorf("error getting messages for: %s: %w", ts.Key(), err)
 	}
+
+	for _, msg := range msgs {
+		totalLimit += msg.VMMessage().GasLimit
+	}
+
 	parentBaseFee := ts.Blocks()[0].ParentBaseFee
 
 	return ComputeNextBaseFee(parentBaseFee, totalLimit, len(ts.Blocks()), ts.Height()), nil
