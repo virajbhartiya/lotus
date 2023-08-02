@@ -359,7 +359,7 @@ func (m *Sealing) handleUpdateActivating(ctx statemachine.Context, sector Sector
 			break
 		}
 
-		log.Errorw("error in handleUpdateActivating", "error", err)
+		log.Warnw("error in handleUpdateActivating", "error", err)
 
 		// likely an API issue, sleep for a bit and retry
 		time.Sleep(time.Minute)
