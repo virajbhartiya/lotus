@@ -366,4 +366,8 @@ func (w *WrapperV1Full) BeaconGetEntry(ctx context.Context, epoch abi.ChainEpoch
 	return w.StateGetBeaconEntry(ctx, epoch)
 }
 
+func (w *WrapperV1Full) SyncCheckpoint(ctx context.Context, tsk types.TipSetKey) error {
+	return xerrors.Errorf("checkpoints are no longer supported")
+}
+
 var _ FullNode = &WrapperV1Full{}

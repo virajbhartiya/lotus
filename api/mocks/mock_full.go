@@ -3878,20 +3878,6 @@ func (mr *MockFullNodeMockRecorder) SyncCheckBad(arg0, arg1 interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncCheckBad", reflect.TypeOf((*MockFullNode)(nil).SyncCheckBad), arg0, arg1)
 }
 
-// SyncCheckpoint mocks base method.
-func (m *MockFullNode) SyncCheckpoint(arg0 context.Context, arg1 types.TipSetKey) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SyncCheckpoint", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SyncCheckpoint indicates an expected call of SyncCheckpoint.
-func (mr *MockFullNodeMockRecorder) SyncCheckpoint(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncCheckpoint", reflect.TypeOf((*MockFullNode)(nil).SyncCheckpoint), arg0, arg1)
-}
-
 // SyncIncomingBlocks mocks base method.
 func (m *MockFullNode) SyncIncomingBlocks(arg0 context.Context) (<-chan *types.BlockHeader, error) {
 	m.ctrl.T.Helper()

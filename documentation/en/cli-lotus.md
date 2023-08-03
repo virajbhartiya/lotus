@@ -3050,7 +3050,6 @@ COMMANDS:
    mark-bad    Mark the given block as bad, will prevent syncing to a chain that contains it
    unmark-bad  Unmark the given block as bad, makes it possible to sync to a chain containing it
    check-bad   check if the given block was marked bad, and for what reason
-   checkpoint  mark a certain tipset as checkpointed; the node will never fork away from this tipset
    help, h     Shows a list of commands or help for one command
 
 OPTIONS:
@@ -3117,19 +3116,6 @@ USAGE:
 
 OPTIONS:
    --help, -h  show help
-```
-
-### lotus sync checkpoint
-```
-NAME:
-   lotus sync checkpoint - mark a certain tipset as checkpointed; the node will never fork away from this tipset
-
-USAGE:
-   lotus sync checkpoint [command options] [tipsetKey]
-
-OPTIONS:
-   --epoch value  checkpoint the tipset at the given epoch (default: 0)
-   --help, -h     show help
 ```
 
 ## lotus status

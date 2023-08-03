@@ -576,8 +576,6 @@ type FullNodeMethods struct {
 
 	SyncCheckBad func(p0 context.Context, p1 cid.Cid) (string, error) `perm:"read"`
 
-	SyncCheckpoint func(p0 context.Context, p1 types.TipSetKey) error `perm:"admin"`
-
 	SyncIncomingBlocks func(p0 context.Context) (<-chan *types.BlockHeader, error) `perm:"read"`
 
 	SyncMarkBad func(p0 context.Context, p1 cid.Cid) error `perm:"admin"`
@@ -3871,17 +3869,6 @@ func (s *FullNodeStruct) SyncCheckBad(p0 context.Context, p1 cid.Cid) (string, e
 
 func (s *FullNodeStub) SyncCheckBad(p0 context.Context, p1 cid.Cid) (string, error) {
 	return "", ErrNotSupported
-}
-
-func (s *FullNodeStruct) SyncCheckpoint(p0 context.Context, p1 types.TipSetKey) error {
-	if s.Internal.SyncCheckpoint == nil {
-		return ErrNotSupported
-	}
-	return s.Internal.SyncCheckpoint(p0, p1)
-}
-
-func (s *FullNodeStub) SyncCheckpoint(p0 context.Context, p1 types.TipSetKey) error {
-	return ErrNotSupported
 }
 
 func (s *FullNodeStruct) SyncIncomingBlocks(p0 context.Context) (<-chan *types.BlockHeader, error) {

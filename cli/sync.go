@@ -13,7 +13,6 @@ import (
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/v0api"
 	"github.com/filecoin-project/lotus/build"
-	"github.com/filecoin-project/lotus/chain/types"
 )
 
 var SyncCmd = &cli.Command{
@@ -25,7 +24,6 @@ var SyncCmd = &cli.Command{
 		SyncMarkBadCmd,
 		SyncUnmarkBadCmd,
 		SyncCheckBadCmd,
-		SyncCheckpointCmd,
 	},
 }
 
@@ -199,48 +197,6 @@ var SyncCheckBadCmd = &cli.Command{
 		}
 
 		afmt.Println(reason)
-		return nil
-	},
-}
-
-var SyncCheckpointCmd = &cli.Command{
-	Name:      "checkpoint",
-	Usage:     "mark a certain tipset as checkpointed; the node will never fork away from this tipset",
-	ArgsUsage: "[tipsetKey]",
-	Flags: []cli.Flag{
-		&cli.Uint64Flag{
-			Name:  "epoch",
-			Usage: "checkpoint the tipset at the given epoch",
-		},
-	},
-	Action: func(cctx *cli.Context) error {
-		napi, closer, err := GetFullNodeAPI(cctx)
-		if err != nil {
-			return err
-		}
-		defer closer()
-		ctx := ReqContext(cctx)
-
-		var ts *types.TipSet
-
-		if cctx.IsSet("epoch") {
-			ts, err = napi.ChainGetTipSetByHeight(ctx, abi.ChainEpoch(cctx.Uint64("epoch")), types.EmptyTSK)
-		}
-		if ts == nil {
-			ts, err = parseTipSet(ctx, napi, cctx.Args().Slice())
-		}
-		if err != nil {
-			return err
-		}
-
-		if ts == nil {
-			return fmt.Errorf("must pass cids for tipset to set as head, or specify epoch flag")
-		}
-
-		if err := napi.SyncCheckpoint(ctx, ts.Key()); err != nil {
-			return err
-		}
-
 		return nil
 	},
 }

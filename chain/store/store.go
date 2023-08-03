@@ -41,7 +41,6 @@ var log = logging.Logger("chainstore")
 
 var (
 	chainHeadKey                  = dstore.NewKey("head")
-	checkpointKey                 = dstore.NewKey("/chain/checks")
 	blockValidationCacheKeyPrefix = dstore.NewKey("blockValidation")
 )
 
@@ -107,7 +106,6 @@ type ChainStore struct {
 
 	heaviestLk sync.RWMutex
 	heaviest   *types.TipSet
-	checkpoint *types.TipSet
 
 	bestTips *pubsub.PubSub
 	pubLk    sync.Mutex
@@ -211,9 +209,6 @@ func (cs *ChainStore) Load(ctx context.Context) error {
 	if err := cs.loadHead(ctx); err != nil {
 		return err
 	}
-	if err := cs.loadCheckpoint(ctx); err != nil {
-		return err
-	}
 	return nil
 }
 func (cs *ChainStore) loadHead(ctx context.Context) error {
@@ -237,31 +232,6 @@ func (cs *ChainStore) loadHead(ctx context.Context) error {
 	}
 
 	cs.heaviest = ts
-
-	return nil
-}
-
-func (cs *ChainStore) loadCheckpoint(ctx context.Context) error {
-	tskBytes, err := cs.metadataDs.Get(ctx, checkpointKey)
-	if err == dstore.ErrNotFound {
-		return nil
-	}
-	if err != nil {
-		return xerrors.Errorf("failed to load checkpoint from datastore: %w", err)
-	}
-
-	var tsk types.TipSetKey
-	err = json.Unmarshal(tskBytes, &tsk)
-	if err != nil {
-		return err
-	}
-
-	ts, err := cs.LoadTipSet(ctx, tsk)
-	if err != nil {
-		return xerrors.Errorf("loading tipset: %w", err)
-	}
-
-	cs.checkpoint = ts
 
 	return nil
 }
@@ -509,11 +479,6 @@ func (cs *ChainStore) exceedsForkLength(ctx context.Context, synced, external *t
 			return false, nil
 		}
 
-		// Now check to see if we've walked back to the checkpoint.
-		if synced.Equals(cs.checkpoint) {
-			return true, nil
-		}
-
 		// If we didn't, go back *one* tipset on the `synced` side (incrementing
 		// the `forkLength`).
 		if synced.Height() == 0 {
@@ -542,9 +507,7 @@ func (cs *ChainStore) ForceHeadSilent(ctx context.Context, ts *types.TipSet) err
 
 	cs.heaviestLk.Lock()
 	defer cs.heaviestLk.Unlock()
-	if err := cs.removeCheckpoint(ctx); err != nil {
-		return err
-	}
+
 	cs.heaviest = ts
 
 	err := cs.writeHead(ctx, ts)
@@ -723,77 +686,10 @@ func FlushValidationCache(ctx context.Context, ds dstore.Batching) error {
 
 // SetHead sets the chainstores current 'best' head node.
 // This should only be called if something is broken and needs fixing.
-//
-// This function will bypass and remove any checkpoints.
 func (cs *ChainStore) SetHead(ctx context.Context, ts *types.TipSet) error {
 	cs.heaviestLk.Lock()
 	defer cs.heaviestLk.Unlock()
-	if err := cs.removeCheckpoint(ctx); err != nil {
-		return err
-	}
 	return cs.takeHeaviestTipSet(context.TODO(), ts)
-}
-
-// RemoveCheckpoint removes the current checkpoint.
-func (cs *ChainStore) RemoveCheckpoint(ctx context.Context) error {
-	cs.heaviestLk.Lock()
-	defer cs.heaviestLk.Unlock()
-	return cs.removeCheckpoint(ctx)
-}
-
-func (cs *ChainStore) removeCheckpoint(ctx context.Context) error {
-	if err := cs.metadataDs.Delete(ctx, checkpointKey); err != nil {
-		return err
-	}
-	cs.checkpoint = nil
-	return nil
-}
-
-// SetCheckpoint will set a checkpoint past which the chainstore will not allow forks.
-//
-// NOTE: Checkpoints cannot be set beyond ForkLengthThreshold epochs in the past.
-func (cs *ChainStore) SetCheckpoint(ctx context.Context, ts *types.TipSet) error {
-	tskBytes, err := json.Marshal(ts.Key())
-	if err != nil {
-		return err
-	}
-
-	cs.heaviestLk.Lock()
-	defer cs.heaviestLk.Unlock()
-
-	if ts.Height() > cs.heaviest.Height() {
-		return xerrors.Errorf("cannot set a checkpoint in the future")
-	}
-
-	// Otherwise, this operation could get _very_ expensive.
-	if cs.heaviest.Height()-ts.Height() > build.ForkLengthThreshold {
-		return xerrors.Errorf("cannot set a checkpoint before the fork threshold")
-	}
-
-	if !ts.Equals(cs.heaviest) {
-		anc, err := cs.IsAncestorOf(ctx, ts, cs.heaviest)
-		if err != nil {
-			return xerrors.Errorf("cannot determine whether checkpoint tipset is in main-chain: %w", err)
-		}
-
-		if !anc {
-			return xerrors.Errorf("cannot mark tipset as checkpoint, since it isn't in the main-chain: %w", err)
-		}
-	}
-	err = cs.metadataDs.Put(ctx, checkpointKey, tskBytes)
-	if err != nil {
-		return err
-	}
-
-	cs.checkpoint = ts
-	return nil
-}
-
-func (cs *ChainStore) GetCheckpoint() *types.TipSet {
-	cs.heaviestLk.RLock()
-	chkpt := cs.checkpoint
-	cs.heaviestLk.RUnlock()
-	return chkpt
 }
 
 // Contains returns whether our BlockStore has all blocks in the supplied TipSet.

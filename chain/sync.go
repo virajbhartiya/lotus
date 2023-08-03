@@ -525,7 +525,7 @@ func (syncer *Syncer) Sync(ctx context.Context, maybeHead *types.TipSet) error {
 		return nil
 	}
 
-	if err := syncer.collectChain(ctx, maybeHead, hts, false); err != nil {
+	if err := syncer.collectChain(ctx, maybeHead, hts); err != nil {
 		span.AddAttributes(trace.StringAttribute("col_error", err.Error()))
 		span.SetStatus(trace.Status{
 			Code:    13,
@@ -681,7 +681,7 @@ func extractSyncState(ctx context.Context) *SyncerState {
 //
 // All throughout the process, we keep checking if the received blocks are in
 // the deny list, and short-circuit the process if so.
-func (syncer *Syncer) collectHeaders(ctx context.Context, incoming *types.TipSet, known *types.TipSet, ignoreCheckpoint bool) ([]*types.TipSet, error) {
+func (syncer *Syncer) collectHeaders(ctx context.Context, incoming *types.TipSet, known *types.TipSet) ([]*types.TipSet, error) {
 	ctx, span := trace.StartSpan(ctx, "collectHeaders")
 	defer span.End()
 	ss := extractSyncState(ctx)
@@ -850,7 +850,7 @@ loop:
 
 	// We have now ascertained that this is *not* a 'fast forward'
 	log.Warnf("(fork detected) synced header chain (%s - %d) does not link to our best block (%s - %d)", incoming.Cids(), incoming.Height(), known.Cids(), known.Height())
-	fork, err := syncer.syncFork(ctx, base, known, ignoreCheckpoint)
+	fork, err := syncer.syncFork(ctx, base, known)
 	if err != nil {
 		if xerrors.Is(err, ErrForkTooLong) || xerrors.Is(err, ErrForkCheckpoint) {
 			// TODO: we're marking this block bad in the same way that we mark invalid blocks bad. Maybe distinguish?
@@ -876,15 +876,7 @@ var ErrForkCheckpoint = fmt.Errorf("fork would require us to diverge from checkp
 // If the fork is too long (build.ForkLengthThreshold), or would cause us to diverge from the checkpoint (ErrForkCheckpoint),
 // we add the entire subchain to the denylist. Else, we find the common ancestor, and add the missing chain
 // fragment until the fork point to the returned []TipSet.
-func (syncer *Syncer) syncFork(ctx context.Context, incoming *types.TipSet, known *types.TipSet, ignoreCheckpoint bool) ([]*types.TipSet, error) {
-
-	var chkpt *types.TipSet
-	if !ignoreCheckpoint {
-		chkpt = syncer.store.GetCheckpoint()
-		if known.Equals(chkpt) {
-			return nil, ErrForkCheckpoint
-		}
-	}
+func (syncer *Syncer) syncFork(ctx context.Context, incoming *types.TipSet, known *types.TipSet) ([]*types.TipSet, error) {
 
 	// TODO: Does this mean we always ask for ForkLengthThreshold blocks from the network, even if we just need, like, 2? Yes.
 	// Would it not be better to ask in smaller chunks, given that an ~ForkLengthThreshold is very rare?
@@ -922,11 +914,6 @@ func (syncer *Syncer) syncFork(ctx context.Context, incoming *types.TipSet, know
 			forkLengthInHead++
 			if forkLengthInHead > int(build.ForkLengthThreshold) {
 				return nil, ErrForkTooLong
-			}
-
-			// We will be forking away from nts, check that it isn't checkpointed
-			if nts.Equals(chkpt) {
-				return nil, ErrForkCheckpoint
 			}
 
 			nts, err = syncer.store.LoadTipSet(ctx, nts.Parents())
@@ -1177,14 +1164,14 @@ func persistMessages(ctx context.Context, bs bstore.Blockstore, bst *exchange.Co
 //
 //  3. StageMessages: having acquired the headers and found a common tipset,
 //     we then move forward, requesting the full blocks, including the messages.
-func (syncer *Syncer) collectChain(ctx context.Context, ts *types.TipSet, hts *types.TipSet, ignoreCheckpoint bool) error {
+func (syncer *Syncer) collectChain(ctx context.Context, ts *types.TipSet, hts *types.TipSet) error {
 	ctx, span := trace.StartSpan(ctx, "collectChain")
 	defer span.End()
 	ss := extractSyncState(ctx)
 
 	ss.Init(hts, ts)
 
-	headers, err := syncer.collectHeaders(ctx, ts, hts, ignoreCheckpoint)
+	headers, err := syncer.collectHeaders(ctx, ts, hts)
 	if err != nil {
 		ss.Error(err)
 		return err
