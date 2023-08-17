@@ -24,6 +24,7 @@ func main() {
 		addressCmd,
 		statActorCmd,
 		statSnapshotCmd,
+		statSectorInfosCmd,
 		statObjCmd,
 		base64Cmd,
 		base32Cmd,

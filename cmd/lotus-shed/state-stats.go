@@ -17,19 +17,24 @@ import (
 	offline "github.com/ipfs/boxo/exchange/offline"
 	"github.com/ipfs/boxo/ipld/merkledag"
 	"github.com/ipfs/go-cid"
+	cbor "github.com/ipfs/go-ipld-cbor"
 	format "github.com/ipfs/go-ipld-format"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/sync/errgroup"
+
 	"golang.org/x/xerrors"
 
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/go-state-types/abi"
 	gstactors "github.com/filecoin-project/go-state-types/actors"
+	"github.com/filecoin-project/go-state-types/big"
 	"github.com/filecoin-project/go-state-types/network"
 
+	miner11 "github.com/filecoin-project/go-state-types/builtin/v11/miner"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors"
+	"github.com/filecoin-project/lotus/chain/actors/adt"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
@@ -573,6 +578,82 @@ var statSnapshotCmd = &cli.Command{
 		}
 
 		return nil
+	},
+}
+
+var statSectorInfosCmd = &cli.Command{
+	Name:  "stat-deadsectors",
+	Usage: "calculates stats on the sector infos of the latest filecoin state",
+	Description: `calculate 
+	1. A breakdown by field of sector info data size
+	2. A total count of sector infos broken down by alive and dead
+	3. A breakdown of the AMT overhead data size of sector infos
+	`,
+	Action: func(cctx *cli.Context) error {
+		ctx := lcli.ReqContext(cctx)
+		h, err := loadChainStore(ctx, cctx.String("repo"))
+		if err != nil {
+			return err
+		}
+		defer h.closer()
+		tsr := &ChainStoreTipSetResolver{
+			Chain: h.cs,
+		}
+
+		ts, err := lcli.LoadTipSet(ctx, cctx, tsr)
+		if err != nil {
+			return err
+		}
+		st, err := h.sm.StateTree(ts.ParentState())
+		if err != nil {
+			return err
+		}
+		adtStore := adt.WrapStore(ctx, cbor.NewCborStore(h.bs))
+		liveCnt := uint64(0)
+		deadCnt := uint64(0)
+		faultyCnt := uint64(0)
+
+		minerActorCnt := 0
+
+		return st.ForEach(func(_ address.Address, act *types.Actor) error {
+			minerActorCnt += 1
+			if minerActorCnt%50000 == 0 {
+				fmt.Printf("%d miners processed\nlive: %d\ndead: %d\nfault: %d\n", minerActorCnt, liveCnt, deadCnt, faultyCnt)
+			}
+			name, _, ok := actors.GetActorMetaByCode(act.Code)
+			if !ok {
+				return fmt.Errorf("unknown actor type")
+			}
+			if name != "miner" {
+				return nil
+			}
+			var st miner11.State
+			if err := adtStore.Get(ctx, act.Head, &st); err != nil {
+				return err
+			}
+			var info miner11.MinerInfo
+			if err := adtStore.Get(ctx, st.Info, &info); err != nil {
+				return err
+			}
+			ss := info.SectorSize
+			dlines, err := st.LoadDeadlines(adtStore)
+			if err != nil {
+				return err
+			}
+			if err := dlines.ForEach(adtStore, func(dlIdx uint64, dline *miner11.Deadline) error {
+				liveCnt += dline.LiveSectors
+				deadCnt += dline.TotalSectors - dline.LiveSectors
+				if dline.FaultyPower.Raw.GreaterThan(big.Zero()) {
+					faultyCnt += dline.FaultyPower.Raw.Uint64() / uint64(ss)
+				}
+				return nil
+			}); err != nil {
+				return err
+			}
+
+			return nil
+		})
+
 	},
 }
 
