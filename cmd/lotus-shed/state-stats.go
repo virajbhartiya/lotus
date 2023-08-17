@@ -624,7 +624,6 @@ var statSectorInfosCmd = &cli.Command{
 			if !ok {
 				return fmt.Errorf("unknown actor type")
 			}
-			fmt.Printf("name: %s\n", name)
 			if name != "storageminer" {
 				return nil
 			}
