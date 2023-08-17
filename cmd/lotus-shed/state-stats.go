@@ -625,12 +625,11 @@ var statSectorInfosCmd = &cli.Command{
 				return fmt.Errorf("unknown actor type")
 			}
 			fmt.Printf("name: %s\n", name)
-			if name != "miner" {
+			if name != "storageminer" {
 				return nil
 			}
 
 			minerActorCnt += 1
-
 			var st miner11.State
 			if err := adtStore.Get(ctx, act.Head, &st); err != nil {
 				return err
