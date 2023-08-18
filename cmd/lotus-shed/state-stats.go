@@ -616,26 +616,13 @@ var statSectorInfosCmd = &cli.Command{
 		minerActorCnt := 0
 
 		// SectorInfo field counting
-		sectorNumberBytes := uint64(0)
-		sealProofBytes := uint64(0)
-		sealedCIDBytes := uint64(0)
-		dealIDsBytes := uint64(0)
-		activationBytes := uint64(0)
-		expirationBytes := uint64(0)
-		dealweightBytes := uint64(0)
-		verifiedWeightBytes := uint64(0)
-		initialPledgeBytes := uint64(0)
-		expectedDayRewardBytes := uint64(0)
-		expectedStoragePledgeBytes := uint64(0)
-		replacedSectorAgeBytes := uint64(0)
-		replacedDayRewardBytes := uint64(0)
-		sectorKeyCIDBytes := uint64(0)
-		simpleQAPowerBytes := uint64(0)
-		sectorInfoBytes := uint64(0)
+		stats := sectorInfoStats{}
 
 		err = st.ForEach(func(_ address.Address, act *types.Actor) error {
 			if minerActorCnt%50000 == 0 {
 				fmt.Printf("%d miners processed\nlive: %d\ndead: %d\nfault: %d\n", minerActorCnt, liveCnt, deadCnt, faultyCnt)
+				printSectorInfoStats(stats)
+
 			}
 			name, _, ok := actors.GetActorMetaByCode(act.Code)
 			if !ok {
@@ -682,7 +669,6 @@ var statSectorInfosCmd = &cli.Command{
 				if err != nil {
 					panic(err)
 				}
-				fmt.Printf("CBOR: %x\n", bs)
 				return uint64(len(bs))
 			}
 			cntCBORBytesBigInt := func(i big.Int) uint64 {
@@ -691,34 +677,32 @@ var statSectorInfosCmd = &cli.Command{
 					panic(err)
 				}
 				bs := buf.Bytes()
-				fmt.Printf("%x\n", bs)
 				return uint64(len(bs))
 			}
 			err = arr.ForEach(&si, func(k int64) error {
-				sectorNumberBytes += cntCBORBytes(si.SectorNumber)
-				sealProofBytes += cntCBORBytes(si.SealProof)
-				sealedCIDBytes += cntCBORBytes(si.SealedCID)
-				dealIDsBytes += cntCBORBytes(si.DealIDs)
-				activationBytes += cntCBORBytes(si.Activation)
-				expirationBytes += cntCBORBytes(si.Expiration)
-				dealweightBytes += cntCBORBytesBigInt(si.DealWeight)
-				verifiedWeightBytes += cntCBORBytesBigInt(si.VerifiedDealWeight)
-				initialPledgeBytes += cntCBORBytesBigInt(si.InitialPledge)
-				expectedDayRewardBytes += cntCBORBytesBigInt(si.ExpectedDayReward)
-				expectedStoragePledgeBytes += cntCBORBytesBigInt(si.ExpectedStoragePledge)
-				replacedSectorAgeBytes += cntCBORBytes(si.ReplacedSectorAge)
-				replacedDayRewardBytes += cntCBORBytesBigInt(si.ReplacedDayReward)
-				sectorKeyCIDBytes += cntCBORBytes(si.SectorKeyCID)
-				simpleQAPowerBytes += cntCBORBytes(si.SimpleQAPower)
+				stats.SectorNumberBytes += cntCBORBytes(si.SectorNumber)
+				stats.SealProofBytes += cntCBORBytes(si.SealProof)
+				stats.SealedCIDBytes += cntCBORBytes(si.SealedCID)
+				stats.DealIDsBytes += cntCBORBytes(si.DealIDs)
+				stats.ActivationBytes += cntCBORBytes(si.Activation)
+				stats.ExpirationBytes += cntCBORBytes(si.Expiration)
+				stats.DealWeightBytes += cntCBORBytesBigInt(si.DealWeight)
+				stats.VerifiedDealWeightBytes += cntCBORBytesBigInt(si.VerifiedDealWeight)
+				stats.InitialPledgeBytes += cntCBORBytesBigInt(si.InitialPledge)
+				stats.ExpectedDayRewardBytes += cntCBORBytesBigInt(si.ExpectedDayReward)
+				stats.ExpectedStoragePledgeBytes += cntCBORBytesBigInt(si.ExpectedStoragePledge)
+				stats.ReplacedSectorAgeBytes += cntCBORBytes(si.ReplacedSectorAge)
+				stats.ReplacedDayRewardBytes += cntCBORBytesBigInt(si.ReplacedDayReward)
+				stats.SectorKeyCIDBytes += cntCBORBytes(si.SectorKeyCID)
+				stats.SimpleQAPowerBytes += cntCBORBytes(si.SimpleQAPower)
 
 				buf := bytes.NewBuffer(make([]byte, 0))
 				if err := si.MarshalCBOR(buf); err != nil {
 					return err
 				}
 				bs := buf.Bytes()
-				fmt.Printf("%x\n", bs)
-				sectorInfoBytes += uint64(len(bs))
-				panic("please stop at the first one")
+				stats.SectorInfoBytes += uint64(len(bs))
+				return nil
 			})
 			if err != nil {
 				return err
@@ -730,45 +714,68 @@ var statSectorInfosCmd = &cli.Command{
 			return err
 		}
 		fmt.Printf("%d total miners processed\nlive: %d\ndead: %d\nfault: %d\n", minerActorCnt, liveCnt, deadCnt, faultyCnt)
-		fmt.Printf(`SectorInfo byte usage by field summary:
-			SectorNumber: %d
-			SealProof: %d
-			SealedCID: %d
-			DealIDs: %d
-			Activation: %d
-			Expiration: %d
-			DealWeight: %d
-			VerifiedDealWeight: %d
-			InitialPledge: %d
-			ExpectedDayReward: %d
-			ExpectedStoragePledge: %d
-			ReplacedSectorAge: %d
-			ReplacedDayReward: %d
-			SectorKeyCID: %d
-			SimpleQAPower: %d
-
-			Total: %d
-		`,
-			sectorNumberBytes,
-			sealProofBytes,
-			sealedCIDBytes,
-			dealIDsBytes,
-			activationBytes,
-			expirationBytes,
-			dealweightBytes,
-			verifiedWeightBytes,
-			initialPledgeBytes,
-			expectedDayRewardBytes,
-			expectedStoragePledgeBytes,
-			replacedSectorAgeBytes,
-			replacedDayRewardBytes,
-			sectorKeyCIDBytes,
-			simpleQAPowerBytes,
-			sectorInfoBytes,
-		)
+		printSectorInfoStats(stats)
 		return nil
 
 	},
+}
+
+type sectorInfoStats struct {
+	SectorNumberBytes          uint64
+	SealProofBytes             uint64
+	SealedCIDBytes             uint64
+	DealIDsBytes               uint64
+	ActivationBytes            uint64
+	ExpirationBytes            uint64
+	DealWeightBytes            uint64
+	VerifiedDealWeightBytes    uint64
+	InitialPledgeBytes         uint64
+	ExpectedDayRewardBytes     uint64
+	ExpectedStoragePledgeBytes uint64
+	ReplacedSectorAgeBytes     uint64
+	ReplacedDayRewardBytes     uint64
+	SectorKeyCIDBytes          uint64
+	SimpleQAPowerBytes         uint64
+	SectorInfoBytes            uint64
+}
+
+func printSectorInfoStats(stats sectorInfoStats) {
+	fmt.Printf(`SectorInfo byte usage by field summary:
+	SectorNumber: %d
+	SealProof: %d
+	SealedCID: %d
+	DealIDs: %d
+	Activation: %d
+	Expiration: %d
+	DealWeight: %d
+	VerifiedDealWeight: %d
+	InitialPledge: %d
+	ExpectedDayReward: %d
+	ExpectedStoragePledge: %d
+	ReplacedSectorAge: %d
+	ReplacedDayReward: %d
+	SectorKeyCID: %d
+	SimpleQAPower: %d
+
+	Total: %d
+`,
+		stats.SectorNumberBytes,
+		stats.SealProofBytes,
+		stats.SealedCIDBytes,
+		stats.DealIDsBytes,
+		stats.ActivationBytes,
+		stats.ExpirationBytes,
+		stats.DealWeightBytes,
+		stats.VerifiedDealWeightBytes,
+		stats.InitialPledgeBytes,
+		stats.ExpectedDayRewardBytes,
+		stats.ExpectedStoragePledgeBytes,
+		stats.ReplacedSectorAgeBytes,
+		stats.ReplacedDayRewardBytes,
+		stats.SectorKeyCIDBytes,
+		stats.SimpleQAPowerBytes,
+		stats.SectorInfoBytes,
+	)
 }
 
 var statActorCmd = &cli.Command{
