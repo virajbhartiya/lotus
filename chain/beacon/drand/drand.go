@@ -8,7 +8,7 @@ import (
 	dchain "github.com/drand/drand/chain"
 	dclient "github.com/drand/drand/client"
 	hclient "github.com/drand/drand/client/http"
-	"github.com/drand/drand/common/scheme"
+	dcrypto "github.com/drand/drand/crypto"
 	dlog "github.com/drand/drand/log"
 	gclient "github.com/drand/drand/lp2p/client"
 	"github.com/drand/kyber"
@@ -47,6 +47,7 @@ type DrandBeacon struct {
 	drandGenTime uint64
 	filGenTime   uint64
 	filRoundTime uint64
+	scheme       *dcrypto.Scheme
 
 	localCache *lru.Cache[uint64, *types.BeaconEntry]
 }
@@ -68,6 +69,9 @@ func (l *logger) Named(s string) dlog.Logger {
 	return &logger{l.SugaredLogger.Named(s)}
 }
 
+func (l *logger) AddCallerSkip(skip int) dlog.Logger {
+	return l
+}
 func NewDrandBeacon(genesisTs, interval uint64, ps *pubsub.PubSub, config dtypes.DrandConfig) (*DrandBeacon, error) {
 	if genesisTs == 0 {
 		panic("what are you doing this cant be zero")
@@ -116,19 +120,24 @@ func NewDrandBeacon(genesisTs, interval uint64, ps *pubsub.PubSub, config dtypes
 		localCache: lc,
 	}
 
+	sch, err := dcrypto.GetSchemeByIDWithDefault(drandChain.Scheme)
+	if err != nil {
+		return nil, err
+	}
+	db.scheme = sch
 	db.pubkey = drandChain.PublicKey
 	db.interval = drandChain.Period
 	db.drandGenTime = uint64(drandChain.GenesisTime)
 	db.filRoundTime = interval
 	db.filGenTime = genesisTs
 
-	return db, nil
+	return db, err
 }
 
-func (db *DrandBeacon) Entry(ctx context.Context, round uint64) <-chan beacon.Response {
+func (d *DrandBeacon) Entry(ctx context.Context, round uint64) <-chan beacon.Response {
 	out := make(chan beacon.Response, 1)
 	if round != 0 {
-		be := db.getCachedValue(round)
+		be := d.getCachedValue(round)
 		if be != nil {
 			out <- beacon.Response{Entry: *be}
 			close(out)
@@ -139,7 +148,7 @@ func (db *DrandBeacon) Entry(ctx context.Context, round uint64) <-chan beacon.Re
 	go func() {
 		start := build.Clock.Now()
 		log.Debugw("start fetching randomness", "round", round)
-		resp, err := db.client.Get(ctx, round)
+		resp, err := d.client.Get(ctx, round)
 
 		var br beacon.Response
 		if err != nil {
@@ -155,26 +164,26 @@ func (db *DrandBeacon) Entry(ctx context.Context, round uint64) <-chan beacon.Re
 
 	return out
 }
-func (db *DrandBeacon) cacheValue(e types.BeaconEntry) {
-	db.localCache.Add(e.Round, &e)
+func (d *DrandBeacon) cacheValue(e types.BeaconEntry) {
+	d.localCache.Add(e.Round, &e)
 }
 
-func (db *DrandBeacon) getCachedValue(round uint64) *types.BeaconEntry {
-	v, _ := db.localCache.Get(round)
+func (d *DrandBeacon) getCachedValue(round uint64) *types.BeaconEntry {
+	v, _ := d.localCache.Get(round)
 	return v
 }
 
-func (db *DrandBeacon) VerifyEntry(curr types.BeaconEntry, prev types.BeaconEntry) error {
+func (d *DrandBeacon) VerifyEntry(curr types.BeaconEntry, prev types.BeaconEntry) error {
 	if prev.Round == 0 {
 		// TODO handle genesis better
 		return nil
 	}
 
-	if curr.Round != prev.Round+1 {
+	if curr.Round != d.NextRound(prev) {
 		return xerrors.Errorf("invalid beacon entry: cur (%d) != prev (%d) + 1", curr.Round, prev.Round)
 	}
 
-	if be := db.getCachedValue(curr.Round); be != nil {
+	if be := d.getCachedValue(curr.Round); be != nil {
 		if !bytes.Equal(curr.Data, be.Data) {
 			return xerrors.New("invalid beacon value, does not match cached good value")
 		}
@@ -186,39 +195,44 @@ func (db *DrandBeacon) VerifyEntry(curr types.BeaconEntry, prev types.BeaconEntr
 		Round:       curr.Round,
 		Signature:   curr.Data,
 	}
-	err := dchain.NewVerifier(scheme.GetSchemeFromEnv()).VerifyBeacon(*b, db.pubkey)
+
+	err := d.scheme.VerifyBeacon(b, d.pubkey)
 	if err == nil {
-		db.cacheValue(curr)
+		d.cacheValue(curr)
 	}
 	return err
 }
 
-func (db *DrandBeacon) MaxBeaconRoundForEpoch(nv network.Version, filEpoch abi.ChainEpoch) uint64 {
+func (d *DrandBeacon) MaxBeaconRoundForEpoch(nv network.Version, filEpoch abi.ChainEpoch) uint64 {
 	// TODO: sometimes the genesis time for filecoin is zero and this goes negative
-	latestTs := ((uint64(filEpoch) * db.filRoundTime) + db.filGenTime) - db.filRoundTime
+	latestTs := ((uint64(filEpoch) * d.filRoundTime) + d.filGenTime) - d.filRoundTime
 
 	if nv <= network.Version15 {
-		return db.maxBeaconRoundV1(latestTs)
+		return d.maxBeaconRoundV1(latestTs)
+	}
+	// FUCK this should really be version20, but 21 isn't in the dependent repo yet
+	if nv <= network.Version19 {
+		return d.maxBeaconRoundV2(latestTs)
 	}
 
-	return db.maxBeaconRoundV2(latestTs)
+	return d.maxBeaconRoundV2(latestTs)
 }
 
-func (db *DrandBeacon) maxBeaconRoundV1(latestTs uint64) uint64 {
-	dround := (latestTs - db.drandGenTime) / uint64(db.interval.Seconds())
+func (d *DrandBeacon) maxBeaconRoundV1(latestTs uint64) uint64 {
+	dround := (latestTs - d.drandGenTime) / uint64(d.interval.Seconds())
 	return dround
 }
 
-func (db *DrandBeacon) maxBeaconRoundV2(latestTs uint64) uint64 {
-	if latestTs < db.drandGenTime {
+func (d *DrandBeacon) maxBeaconRoundV2(latestTs uint64) uint64 {
+	if latestTs < d.drandGenTime {
 		return 1
 	}
 
-	fromGenesis := latestTs - db.drandGenTime
+	fromGenesis := latestTs - d.drandGenTime
 	// we take the time from genesis divided by the periods in seconds, that
 	// gives us the number of periods since genesis.  We also add +1 because
 	// round 1 starts at genesis time.
-	return fromGenesis/uint64(db.interval.Seconds()) + 1
+	return fromGenesis/uint64(d.interval.Seconds()) + 1
 }
 
 var _ beacon.RandomBeacon = (*DrandBeacon)(nil)
@@ -234,4 +248,16 @@ func BeaconScheduleFromDrandSchedule(dcs dtypes.DrandSchedule, genesisTime uint6
 	}
 
 	return shd, nil
+}
+
+func (d *DrandBeacon) PrevRound(current types.BeaconEntry) uint64 {
+	drandRoundsPerFilecoinRound := d.filRoundTime / uint64(d.interval.Seconds())
+	if current.Round <= drandRoundsPerFilecoinRound {
+		return 1
+	}
+	return current.Round - drandRoundsPerFilecoinRound
+}
+func (d *DrandBeacon) NextRound(current types.BeaconEntry) uint64 {
+	drandRoundsPerFilecoinRound := d.filRoundTime / uint64(d.interval.Seconds())
+	return current.Round + drandRoundsPerFilecoinRound
 }

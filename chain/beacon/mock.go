@@ -61,4 +61,11 @@ func (mb *mockBeacon) MaxBeaconRoundForEpoch(nv network.Version, epoch abi.Chain
 	return uint64(epoch + 100)
 }
 
+func (mb *mockBeacon) PrevRound(entry types.BeaconEntry) uint64 {
+	return entry.Round - 1
+}
+func (mb *mockBeacon) NextRound(entry types.BeaconEntry) uint64 {
+	return entry.Round + 1
+}
+
 var _ RandomBeacon = (*mockBeacon)(nil)

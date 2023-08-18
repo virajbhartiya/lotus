@@ -2,7 +2,6 @@ package beacon
 
 import (
 	"context"
-
 	logging "github.com/ipfs/go-log/v2"
 	"golang.org/x/xerrors"
 
@@ -41,10 +40,13 @@ type BeaconPoint struct {
 // Other components interrogate the RandomBeacon to acquire randomness that's
 // valid for a specific chain epoch. Also to verify beacon entries that have
 // been posted on chain.
+// FUCK maybe I need to change this interface?
 type RandomBeacon interface {
 	Entry(context.Context, uint64) <-chan Response
 	VerifyEntry(types.BeaconEntry, types.BeaconEntry) error
 	MaxBeaconRoundForEpoch(network.Version, abi.ChainEpoch) uint64
+	NextRound(types.BeaconEntry) uint64
+	PrevRound(types.BeaconEntry) uint64
 }
 
 func ValidateBlockValues(bSchedule Schedule, nv network.Version, h *types.BlockHeader, parentEpoch abi.ChainEpoch,
@@ -102,7 +104,7 @@ func BeaconEntriesForBlock(ctx context.Context, bSchedule Schedule, nv network.V
 			// Fork logic
 			round := currBeacon.MaxBeaconRoundForEpoch(nv, epoch)
 			out := make([]types.BeaconEntry, 2)
-			rch := currBeacon.Entry(ctx, round-1)
+			rch := currBeacon.Entry(ctx, prev.Round)
 			res := <-rch
 			if res.Err != nil {
 				return nil, xerrors.Errorf("getting entry %d returned error: %w", round-1, res.Err)
