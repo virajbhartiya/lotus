@@ -31,10 +31,10 @@ import (
 	"github.com/filecoin-project/go-state-types/network"
 
 	miner11 "github.com/filecoin-project/go-state-types/builtin/v11/miner"
+	adt "github.com/filecoin-project/go-state-types/builtin/v11/util/adt"
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/blockstore"
 	"github.com/filecoin-project/lotus/chain/actors"
-	"github.com/filecoin-project/lotus/chain/actors/adt"
 	"github.com/filecoin-project/lotus/chain/actors/builtin"
 	"github.com/filecoin-project/lotus/chain/consensus"
 	"github.com/filecoin-project/lotus/chain/consensus/filcns"
@@ -615,6 +615,24 @@ var statSectorInfosCmd = &cli.Command{
 
 		minerActorCnt := 0
 
+		// SectorInfo field counting
+		sectorNumberBytes := uint64(0)
+		sealProofBytes := uint64(0)
+		sealedCIDBytes := uint64(0)
+		dealIDsBytes := uint64(0)
+		activationBytes := uint64(0)
+		expirationBytes := uint64(0)
+		dealweightBytes := uint64(0)
+		verifiedWeightBytes := uint64(0)
+		initialPledgeBytes := uint64(0)
+		expectedDayRewardBytes := uint64(0)
+		expectedStoragePledgeBytes := uint64(0)
+		replacedSectorAgeBytes := uint64(0)
+		replacedDayRewardBytes := uint64(0)
+		sectorKeyCIDBytes := uint64(0)
+		simpleQAPowerBytes := uint64(0)
+		sectorInfoBytes := uint64(0)
+
 		err = st.ForEach(func(_ address.Address, act *types.Actor) error {
 			if minerActorCnt%50000 == 0 {
 				fmt.Printf("%d miners processed\nlive: %d\ndead: %d\nfault: %d\n", minerActorCnt, liveCnt, deadCnt, faultyCnt)
@@ -636,6 +654,8 @@ var statSectorInfosCmd = &cli.Command{
 			if err := adtStore.Get(ctx, st.Info, &info); err != nil {
 				return err
 			}
+
+			// Get sector info count
 			ss := info.SectorSize
 			dlines, err := st.LoadDeadlines(adtStore)
 			if err != nil {
@@ -652,13 +672,91 @@ var statSectorInfosCmd = &cli.Command{
 				return err
 			}
 
+			arr, err := adt.AsArray(adtStore, st.Sectors, miner11.SectorsAmtBitwidth)
+			if err != nil {
+				return err
+			}
+			var si miner11.SectorOnChainInfo
+			cntCBORBytes := func(i interface{}) uint64 {
+				bs, err := cbor.DumpObject(i)
+				if err != nil {
+					panic(err)
+				}
+				fmt.Printf("CBOR: %x\n", bs)
+				return uint64(len(bs))
+			}
+			err = arr.ForEach(&si, func(k int64) error {
+				sectorNumberBytes += cntCBORBytes(si.SectorNumber)
+				sealProofBytes += cntCBORBytes(si.SealProof)
+				sealedCIDBytes += cntCBORBytes(si.SealedCID)
+				dealIDsBytes += cntCBORBytes(si.DealIDs)
+				activationBytes += cntCBORBytes(si.Activation)
+				expirationBytes += cntCBORBytes(si.Expiration)
+				dealweightBytes += cntCBORBytes(si.DealWeight)
+				verifiedWeightBytes += cntCBORBytes(si.VerifiedDealWeight)
+				initialPledgeBytes += cntCBORBytes(si.InitialPledge)
+				expectedDayRewardBytes += cntCBORBytes(si.ExpectedDayReward)
+				expectedStoragePledgeBytes += cntCBORBytes(si.ExpectedStoragePledge)
+				replacedSectorAgeBytes += cntCBORBytes(si.ReplacedSectorAge)
+				replacedDayRewardBytes += cntCBORBytes(si.ReplacedDayReward)
+				sectorKeyCIDBytes += cntCBORBytes(si.SectorKeyCID)
+				simpleQAPowerBytes += cntCBORBytes(si.SimpleQAPower)
+
+				buf := bytes.NewBuffer(make([]byte, 0))
+				if err := si.MarshalCBOR(buf); err != nil {
+					return err
+				}
+				bs := buf.Bytes()
+				fmt.Printf("%x\n", bs)
+				sectorInfoBytes += uint64(len(bs))
+				panic("please stop at the first one")
+			})
+			if err != nil {
+				return err
+			}
+
 			return nil
 		})
 		if err != nil {
 			return err
 		}
 		fmt.Printf("%d total miners processed\nlive: %d\ndead: %d\nfault: %d\n", minerActorCnt, liveCnt, deadCnt, faultyCnt)
+		fmt.Printf(`SectorInfo byte usage by field summary:
+			SectorNumber: %d
+			SealProof: %d
+			SealedCID: %d
+			DealIDs: %d
+			Activation: %d
+			Expiration: %d
+			DealWeight: %d
+			VerifiedDealWeight: %d
+			InitialPledge: %d
+			ExpectedDayReward: %d
+			ExpectedStoragePledge: %d
+			ReplacedSectorAge: %d
+			ReplacedDayReward: %d
+			SectorKeyCID: %d
+			SimpleQAPower: %d
 
+			Total: %d
+		`,
+			sectorNumberBytes,
+			sealProofBytes,
+			sealedCIDBytes,
+			dealIDsBytes,
+			activationBytes,
+			expirationBytes,
+			dealweightBytes,
+			verifiedWeightBytes,
+			initialPledgeBytes,
+			expectedDayRewardBytes,
+			expectedStoragePledgeBytes,
+			replacedSectorAgeBytes,
+			replacedDayRewardBytes,
+			sectorKeyCIDBytes,
+			simpleQAPowerBytes,
+			sectorInfoBytes,
+		)
 		return nil
 
 	},
