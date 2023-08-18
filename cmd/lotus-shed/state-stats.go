@@ -621,7 +621,7 @@ var statSectorInfosCmd = &cli.Command{
 
 		err = st.ForEach(func(_ address.Address, act *types.Actor) error {
 			if minerActorCnt%50000 == 0 {
-				fmt.Printf("%d miners processed\nlive: %d\ndead: %d\nfault: %d\n", minerActorCnt, liveCnt, deadCnt, faultyCnt)
+				fmt.Printf("%d miners processed\nlive: %d\ndead: %d\nfault: %d\nhas-deals\n", minerActorCnt, liveCnt, deadCnt, faultyCnt, dealSectorCnt)
 				printSectorInfoStats(stats)
 
 			}
