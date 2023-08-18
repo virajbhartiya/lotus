@@ -612,6 +612,7 @@ var statSectorInfosCmd = &cli.Command{
 		liveCnt := uint64(0)
 		deadCnt := uint64(0)
 		faultyCnt := uint64(0)
+		dealSectorCnt := uint64(0)
 
 		minerActorCnt := 0
 
@@ -680,6 +681,10 @@ var statSectorInfosCmd = &cli.Command{
 				return uint64(len(bs))
 			}
 			err = arr.ForEach(&si, func(k int64) error {
+				if len(si.DealIDs) > 0 {
+					dealSectorCnt += 1
+				}
+
 				stats.SectorNumberBytes += cntCBORBytes(si.SectorNumber)
 				stats.SealProofBytes += cntCBORBytes(si.SealProof)
 				stats.SealedCIDBytes += cntCBORBytes(si.SealedCID)
@@ -713,7 +718,7 @@ var statSectorInfosCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("%d total miners processed\nlive: %d\ndead: %d\nfault: %d\n", minerActorCnt, liveCnt, deadCnt, faultyCnt)
+		fmt.Printf("%d total miners processed\nlive: %d\ndead: %d\nfault: %d\nhas-deals: %d\n", minerActorCnt, liveCnt, deadCnt, faultyCnt, dealSectorCnt)
 		printSectorInfoStats(stats)
 		return nil
 
