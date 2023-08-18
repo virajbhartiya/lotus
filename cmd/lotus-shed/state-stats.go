@@ -685,6 +685,15 @@ var statSectorInfosCmd = &cli.Command{
 				fmt.Printf("CBOR: %x\n", bs)
 				return uint64(len(bs))
 			}
+			cntCBORBytesBigInt := func(i big.Int) uint64 {
+				buf := bytes.NewBuffer(make([]byte, 0))
+				if err := i.MarshalCBOR(buf); err != nil {
+					panic(err)
+				}
+				bs := buf.Bytes()
+				fmt.Printf("%x\n", bs)
+				return uint64(len(bs))
+			}
 			err = arr.ForEach(&si, func(k int64) error {
 				sectorNumberBytes += cntCBORBytes(si.SectorNumber)
 				sealProofBytes += cntCBORBytes(si.SealProof)
@@ -692,13 +701,13 @@ var statSectorInfosCmd = &cli.Command{
 				dealIDsBytes += cntCBORBytes(si.DealIDs)
 				activationBytes += cntCBORBytes(si.Activation)
 				expirationBytes += cntCBORBytes(si.Expiration)
-				dealweightBytes += cntCBORBytes(si.DealWeight)
-				verifiedWeightBytes += cntCBORBytes(si.VerifiedDealWeight)
-				initialPledgeBytes += cntCBORBytes(si.InitialPledge)
-				expectedDayRewardBytes += cntCBORBytes(si.ExpectedDayReward)
-				expectedStoragePledgeBytes += cntCBORBytes(si.ExpectedStoragePledge)
+				dealweightBytes += cntCBORBytesBigInt(si.DealWeight)
+				verifiedWeightBytes += cntCBORBytesBigInt(si.VerifiedDealWeight)
+				initialPledgeBytes += cntCBORBytesBigInt(si.InitialPledge)
+				expectedDayRewardBytes += cntCBORBytesBigInt(si.ExpectedDayReward)
+				expectedStoragePledgeBytes += cntCBORBytesBigInt(si.ExpectedStoragePledge)
 				replacedSectorAgeBytes += cntCBORBytes(si.ReplacedSectorAge)
-				replacedDayRewardBytes += cntCBORBytes(si.ReplacedDayReward)
+				replacedDayRewardBytes += cntCBORBytesBigInt(si.ReplacedDayReward)
 				sectorKeyCIDBytes += cntCBORBytes(si.SectorKeyCID)
 				simpleQAPowerBytes += cntCBORBytes(si.SimpleQAPower)
 
