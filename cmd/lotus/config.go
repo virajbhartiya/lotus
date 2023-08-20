@@ -8,6 +8,7 @@ import (
 
 	"github.com/filecoin-project/lotus/node/config"
 	"github.com/filecoin-project/lotus/node/repo"
+	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
 var configCmd = &cli.Command{
@@ -16,6 +17,7 @@ var configCmd = &cli.Command{
 	Subcommands: []*cli.Command{
 		configDefaultCmd,
 		configUpdateCmd,
+		configDiffCmd,
 	},
 }
 
@@ -89,6 +91,59 @@ var configUpdateCmd = &cli.Command{
 		}
 
 		fmt.Print(string(updated))
+		return nil
+	},
+}
+
+var configDiffCmd = &cli.Command{
+	Name:  "diff",
+	Usage: "Show diff between default and current node config",
+	Action: func(cctx *cli.Context) error {
+		r, err := repo.NewFS(cctx.String("repo"))
+		if err != nil {
+			return err
+		}
+
+		ok, err := r.Exists()
+		if err != nil {
+			return err
+		}
+
+		if !ok {
+			return xerrors.Errorf("repo not initialized")
+		}
+
+		lr, err := r.LockRO(repo.FullNode)
+		if err != nil {
+			return xerrors.Errorf("locking repo: %w", err)
+		}
+
+		cfgNode, err := lr.Config()
+		if err != nil {
+			_ = lr.Close()
+			return xerrors.Errorf("getting node config: %w", err)
+		}
+
+		if err := lr.Close(); err != nil {
+			return err
+		}
+
+		cfgDef := config.DefaultFullNode()
+
+		updated, err := config.ConfigUpdate(cfgNode, cfgDef, config.Commented(true), config.DefaultKeepUncommented())
+		if err != nil {
+			return err
+		}
+
+		defaultCfg, err := config.ConfigUpdate(cfgDef, nil, config.Commented(true), config.DefaultKeepUncommented())
+		if err != nil {
+			return err
+		}
+
+		dmp := diffmatchpatch.New()
+		diffs := dmp.DiffMain(string(defaultCfg), string(updated), false)
+
+		fmt.Print(dmp.DiffPrettyText(diffs))
 		return nil
 	},
 }
