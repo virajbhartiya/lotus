@@ -827,4 +827,20 @@ func TestMigrationNV21(t *testing.T) {
 
 	//todo @zen Direct data onboarding tests
 
+	// to confirm that our sector index works:
+	// before migration prove sectors with deals
+	// make some sectors, make sure they have deals
+	// migrate the deals  (wait till chain)
+	// look confirm deal ids are in sector index -> actor id -> sector number -> deal ids
+
+	// now that we are post migration, index should be updated when deals change
+	// test add deal:
+	// create new deal make sure that deal is in index
+
+	// out of scope but if time:
+	//   test terminate deals:
+	//   test sector is in index
+	//   delete deal and confirm deal is deleted
+	//   terminate a sector and ensure that it is no longer in the index
+
 }
