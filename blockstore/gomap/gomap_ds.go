@@ -16,13 +16,13 @@ import (
 var log = logging.Logger("gomapbs")
 
 type GomapDatastore struct {
-	gmap *gomap.Hashmap
+	gmap *gomap.HashmapDistributed
 	lock sync.RWMutex
 }
 
 func NewGomapDS(folder string) (*GomapDatastore, error) {
 	fmt.Println("NewGomapDS", folder)
-	var h gomap.Hashmap
+	var h gomap.HashmapDistributed
 	h.New(folder)
 	gmds := GomapDatastore{gmap: &h}
 	return &gmds, nil
@@ -33,24 +33,34 @@ func toKey(key cid.Cid) []byte {
 	return key.Bytes() //todo zero copy?
 }
 
-func (gmds *GomapDatastore) Put(ctx context.Context, block blocks.Block) error {
+func (gmds *GomapDatastore) Put(ctx context.Context, b blocks.Block) error {
 	gmds.lock.Lock()
 	defer gmds.lock.Unlock()
-	gmds.gmap.Add(toKey(block.Cid()), block.RawData())
+	gmds.gmap.Add(toKey(b.Cid()), b.RawData())
 	//todo less copy and return err
 	return nil
 }
 
-func (gmds *GomapDatastore) PutMany(ctx context.Context, blocks []blocks.Block) error {
-	items := make([]gomap.Item, len(blocks))
-	for i, block := range blocks {
-		items[i] = gomap.Item{Key: toKey(block.Cid()), Value: block.RawData()}
-	}
-
+func (gmds *GomapDatastore) PutMany(ctx context.Context, blks []blocks.Block) error {
+	var wg sync.WaitGroup
+	//hold lock for datastore
+	//internally gomap uses a lock for each shard and is safe
 	gmds.lock.Lock()
 	defer gmds.lock.Unlock()
 
-	gmds.gmap.AddMany(items)
+	for _, block := range blks {
+		// Increment the WaitGroup counter.
+		wg.Add(1)
+
+		// Start a new goroutine.
+		go func(b blocks.Block) {
+			defer wg.Done() // Decrement the counter when the goroutine completes.
+			gmds.gmap.Add(toKey(b.Cid()), b.RawData())
+		}(block)
+	}
+
+	// Wait for all goroutines to finish.
+	wg.Wait()
 
 	return nil
 }
