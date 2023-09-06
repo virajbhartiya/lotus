@@ -812,7 +812,7 @@ func extractRoutableIP(timeout time.Duration) (string, error) {
 		return "", err
 	}
 
-	minerIP, _ := maddr.ValueForProtocol(multiaddr.P_IP6)
+	minerIP, _ := maddr.ValueForProtocol(multiaddr.P_IP4)
 	minerPort, _ := maddr.ValueForProtocol(multiaddr.P_TCP)
 
 	log.Infof("minerIP: %s, minerPort: %s", minerIP, minerPort) // Debug log
