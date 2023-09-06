@@ -805,6 +805,8 @@ func extractRoutableIP(timeout time.Duration) (string, error) {
 	// Only take the multiaddress part
 	maddrStr := splitEnv[1]
 
+	log.Infof("maddrStr: %s", maddrStr) // Debug log
+
 	maddr, err := multiaddr.NewMultiaddr(maddrStr)
 	if err != nil {
 		return "", err
@@ -813,6 +815,8 @@ func extractRoutableIP(timeout time.Duration) (string, error) {
 	minerIP, _ := maddr.ValueForProtocol(multiaddr.P_IP6)
 	minerPort, _ := maddr.ValueForProtocol(multiaddr.P_TCP)
 
+	log.Infof("minerIP: %s, minerPort: %s", minerIP, minerPort) // Debug log
+
 	// Check if the IP is IPv6 and format the address appropriately
 	var addressToDial string
 	if ip := net.ParseIP(minerIP); ip.To4() == nil && ip.To16() != nil {
@@ -820,6 +824,8 @@ func extractRoutableIP(timeout time.Duration) (string, error) {
 	} else {
 		addressToDial = minerIP + ":" + minerPort
 	}
+
+	log.Infof("addressToDial: %s", addressToDial) // Debug log
 
 	conn, err := net.DialTimeout("tcp", addressToDial, timeout)
 	if err != nil {
