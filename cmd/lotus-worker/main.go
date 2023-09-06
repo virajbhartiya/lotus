@@ -562,6 +562,10 @@ var runCmd = &cli.Command{
 			return err
 		}
 
+		// Before parsing the IP address, print the host and port variables
+		log.Infof("Host: %s, Port: %s", host, port)
+		ip := net.ParseIP(host)
+
 		if ip := net.ParseIP(host); ip != nil {
 			if ip.String() == unspecifiedAddress {
 				timeout, err := time.ParseDuration(cctx.String("timeout"))
@@ -576,15 +580,21 @@ var runCmd = &cli.Command{
 			}
 		}
 
+		// After parsing the IP address, print the parsed IP
+		log.Infof("Parsed IP: %v", ip)
+
 		var newAddress string
 
 		// Check if the IP address is IPv6
-		ip := net.ParseIP(host)
+		ip = net.ParseIP(host)
 		if ip.To4() == nil && ip.To16() != nil {
 			newAddress = "[" + host + "]:" + port
 		} else {
 			newAddress = host + ":" + port
 		}
+
+		// After constructing the newAddress, print it
+		log.Infof("New Address: %s", newAddress)
 
 		localStore, err := paths.NewLocal(ctx, lr, nodeApi, []string{"http://" + newAddress + "/remote"})
 		if err != nil {
