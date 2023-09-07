@@ -765,10 +765,34 @@ waitForProof20:
 }
 
 func TestMigrationNV21(t *testing.T) {
+
+	// Suppress unnecessary mining logs to keep the test output clean.
 	kit.QuietMiningLogs()
 
-	nv21epoch := abi.ChainEpoch(100)
+	// Generate keys for various entities: root, two verifiers, and a verified client.
+	rootKey, err := key.GenerateKey(types.KTSecp256k1)
+	require.NoError(t, err)
+
+	verifier1Key, err := key.GenerateKey(types.KTSecp256k1)
+	require.NoError(t, err)
+
+	verifier2Key, err := key.GenerateKey(types.KTSecp256k1)
+	require.NoError(t, err)
+
+	verifiedClientKey, err := key.GenerateKey(types.KTBLS)
+	require.NoError(t, err)
+
+	// Set initial balance for these entities.
+	bal, err := types.ParseFIL("100fil")
+	require.NoError(t, err)
+
+	// Set the epoch for the NV21 upgrade.
+	nv21epoch := abi.ChainEpoch(10)
 	testClient, _, ens := kit.EnsembleMinimal(t, kit.MockProofs(),
+		kit.RootVerifier(rootKey, abi.NewTokenAmount(bal.Int64())),
+		kit.Account(verifier1Key, abi.NewTokenAmount(bal.Int64())),
+		kit.Account(verifier2Key, abi.NewTokenAmount(bal.Int64())),
+		kit.Account(verifiedClientKey, abi.NewTokenAmount(bal.Int64())),
 		kit.UpgradeSchedule(stmgr.Upgrade{
 			Network: network.Version20,
 			Height:  -1,
@@ -779,11 +803,83 @@ func TestMigrationNV21(t *testing.T) {
 		},
 		))
 
+	// Connect all nodes and start mining.
 	ens.InterconnectAll().BeginMining(10 * time.Millisecond)
 
+	// Get API for the test client.
 	clientApi := testClient.FullNode.(*impl.FullNodeAPI)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Retrieve the Verified Registry Root Key (VRH).
+	vrh, err := clientApi.StateVerifiedRegistryRootKey(ctx, types.TipSetKey{})
+	fmt.Println(vrh.String())
+	require.NoError(t, err)
+
+	// Import the root, verifiers, and verified client keys into the test client's wallet.
+	rootAddr, err := clientApi.WalletImport(ctx, &rootKey.KeyInfo)
+	require.NoError(t, err)
+
+	verifier1Addr, err := clientApi.WalletImport(ctx, &verifier1Key.KeyInfo)
+	require.NoError(t, err)
+	verifier1IDAddr, err := clientApi.StateLookupID(ctx, verifier1Addr, types.EmptyTSK)
+	require.NoError(t, err)
+
+	verifier2Addr, err := clientApi.WalletImport(ctx, &verifier2Key.KeyInfo)
+	require.NoError(t, err)
+	verifier2IDAddr, err := clientApi.StateLookupID(ctx, verifier2Addr, types.EmptyTSK)
+	require.NoError(t, err)
+
+	verifiedClientAddr, err := clientApi.WalletImport(ctx, &verifiedClientKey.KeyInfo)
+	require.NoError(t, err)
+	verifiedClientIDAddr, err := clientApi.StateLookupID(ctx, verifiedClientAddr, types.EmptyTSK)
+	require.NoError(t, err)
+
+	// Add the verifiers using the root key.
+	params, err := actors.SerializeParams(&verifregst.AddVerifierParams{Address: verifier1Addr, Allowance: big.NewInt(100000000000)})
+	require.NoError(t, err)
+	msg := &types.Message{
+		From:   rootAddr,
+		To:     verifreg.Address,
+		Method: verifreg.Methods.AddVerifier,
+		Params: params,
+		Value:  big.Zero(),
+	}
+	sm, err := clientApi.MpoolPushMessage(ctx, msg, nil)
+	require.NoError(t, err, "AddVerifier failed")
+	res, err := clientApi.StateWaitMsg(ctx, sm.Cid(), 1, api.LookbackNoLimit, true)
+	require.NoError(t, err)
+	require.True(t, res.Receipt.ExitCode.IsSuccess())
+
+	// Repeat the procedure for the second verifier.
+	params, err = actors.SerializeParams(&verifregst.AddVerifierParams{Address: verifier2Addr, Allowance: big.NewInt(100000000000)})
+	require.NoError(t, err)
+	msg = &types.Message{
+		From:   rootAddr,
+		To:     verifreg.Address,
+		Method: verifreg.Methods.AddVerifier,
+		Params: params,
+		Value:  big.Zero(),
+	}
+	sm, err = clientApi.MpoolPushMessage(ctx, msg, nil)
+	require.NoError(t, err, "AddVerifier failed")
+	res, err = clientApi.StateWaitMsg(ctx, sm.Cid(), 1, api.LookbackNoLimit, true)
+	require.NoError(t, err)
+	require.True(t, res.Receipt.ExitCode.IsSuccess())
+
+	// Assign datacap to the verified client.
+	datacapToAssign := big.NewInt(10000)
+	params, err = actors.SerializeParams(&verifregst.AddVerifiedClientParams{Address: verifiedClientAddr, Allowance: datacapToAssign})
+	require.NoError(t, err)
+	msg = &types.Message{
+		From:   verifier1Addr,
+		To:     verifreg.Address,
+		Method: verifreg.Methods.AddVerifiedClient,
+		Params: params,
+		Value:  big.Zero(),
+	}
+	sm, err = clientApi.MpoolPushMessage(ctx, msg, nil)
+	require.NoError(t, err)
 
 	testClient.WaitTillChain(ctx, kit.HeightAtLeast(nv21epoch+5))
 
@@ -821,6 +917,116 @@ func TestMigrationNV21(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, manifest12.Data, systemSt.GetBuiltinActors())
 
+	// The deal has a pending allocation
+	marketAct, err := newStateTree.GetActor(builtin.StorageMarketActorAddr)
+	require.NoError(t, err)
+
+	marketSt, err := market.Load(ctxStore, marketAct)
+	require.NoError(t, err)
+
+	allocationId, err := marketSt.GetAllocationIdForPendingDeal(dealIds[0])
+	require.NoError(t, err)
+	require.Equal(t, verifregst.AllocationId(1), allocationId)
+
+	minerInfo, err := testClient.StateMinerInfo(ctx, testMiner.ActorAddr, types.EmptyTSK)
+	require.NoError(t, err)
+
+	spt, err := miner.SealProofTypeFromSectorSize(minerInfo.SectorSize, network.Version17, false)
+	require.NoError(t, err)
+
+	preCommitParams := miner9.PreCommitSectorParams{
+		SealProof:     spt,
+		SectorNumber:  1000,
+		SealedCID:     migration.MakeCID("sector", &miner9.SealedCIDPrefix),
+		SealRandEpoch: nv17epoch,
+		DealIDs:       dealIds,
+		Expiration:    dealProposal.EndEpoch,
+	}
+
+	serializedParams = new(bytes.Buffer)
+	require.NoError(t, preCommitParams.MarshalCBOR(serializedParams))
+
+	m, err = clientApi.MpoolPushMessage(ctx, &types.Message{
+		To:     testMiner.ActorAddr,
+		From:   testMiner.OwnerKey.Address,
+		Value:  types.FromFil(0),
+		Method: builtin.MethodsMiner.PreCommitSector,
+		Params: serializedParams.Bytes(),
+	}, nil)
+	require.NoError(t, err)
+
+	r, err = clientApi.StateWaitMsg(ctx, m.Cid(), 2, api.LookbackNoLimit, true)
+	require.NoError(t, err)
+	require.True(t, r.Receipt.ExitCode.IsSuccess())
+
+	testClient.WaitTillChain(ctx, kit.HeightAtLeast(r.Height+miner9.PreCommitChallengeDelay+5))
+
+	proveCommitParams := miner9.ProveCommitSectorParams{
+		SectorNumber: preCommitParams.SectorNumber,
+		Proof:        []byte{0xde, 0xad, 0xbe, 0xef},
+	}
+
+	serializedParams = new(bytes.Buffer)
+	require.NoError(t, proveCommitParams.MarshalCBOR(serializedParams))
+
+	m, err = clientApi.MpoolPushMessage(ctx, &types.Message{
+		To:     testMiner.ActorAddr,
+		From:   testMiner.OwnerKey.Address,
+		Value:  types.FromFil(0),
+		Method: builtin.MethodsMiner.ProveCommitSector,
+		Params: serializedParams.Bytes(),
+	}, nil)
+	require.NoError(t, err)
+
+	r, err = clientApi.StateWaitMsg(ctx, m.Cid(), 2, api.LookbackNoLimit, true)
+	require.NoError(t, err)
+	require.True(t, r.Receipt.ExitCode.IsSuccess())
+
+	// Yay, the deal has been activated! Let's assert that it has a claim.
+
+	currTs, err = clientApi.ChainHead(ctx)
+	require.NoError(t, err)
+
+	newStateTree, err = state.LoadStateTree(ctxStore, currTs.Blocks()[0].ParentStateRoot)
+	require.NoError(t, err)
+
+	verifregAct, err := newStateTree.GetActor(builtin.VerifiedRegistryActorAddr)
+	require.NoError(t, err)
+
+	verifregSt, err := verifreg.Load(ctxStore, verifregAct)
+	require.NoError(t, err)
+
+	claims, err := verifregSt.GetClaims(testMiner.ActorAddr)
+	require.NoError(t, err)
+
+	require.Equal(t, len(claims), 1)
+	claim, ok := claims[1]
+	require.True(t, ok)
+
+	claimerIdAddr, err := address.NewIDAddress(uint64(claim.Client))
+	require.NoError(t, err)
+
+	require.Equal(t, verifiedClientIDAddr, claimerIdAddr)
+
+	// And that the deal no longer has a pending allocation
+
+	marketAct, err = newStateTree.GetActor(builtin.StorageMarketActorAddr)
+	require.NoError(t, err)
+
+	marketSt, err = market.Load(ctxStore, marketAct)
+	require.NoError(t, err)
+
+	allocationId, err = marketSt.GetAllocationIdForPendingDeal(dealIds[0])
+	require.NoError(t, err)
+	require.Equal(t, verifregst.NoAllocationID, allocationId)
+
+	testClient.WaitTillChain(ctx, kit.HeightAtLeast(dealProposal.StartEpoch+5))
+
+	currTs, err = clientApi.ChainHead(ctx)
+	require.NoError(t, err)
+
+	cso, err := clientApi.StateCompute(ctx, currTs.Height(), nil, currTs.Key())
+	require.NoError(t, err)
 	// start post migration checks
 
 	//todo @aayush sector info changes
