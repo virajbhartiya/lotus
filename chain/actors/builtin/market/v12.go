@@ -188,13 +188,13 @@ func (s *dealStates12) array() adt.Array {
 
 func fromV12DealState(v12 market12.DealState) DealState {
 	ret := DealState{
+    // todo verify this struct is ok
+		// SectorNumber: v12.SectorNumber,
 		SectorStartEpoch: v12.SectorStartEpoch,
 		LastUpdatedEpoch: v12.LastUpdatedEpoch,
 		SlashEpoch:       v12.SlashEpoch,
-		VerifiedClaim:    0,
 	}
 
-	ret.VerifiedClaim = verifregtypes.AllocationId(v12.VerifiedClaim)
 
 	return ret
 }
