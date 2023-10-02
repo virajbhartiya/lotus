@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -321,6 +322,29 @@ var runCmd = &cli.Command{
 			}
 		}
 
+		// Check DC-environment variable
+		sectorSizes := []string{"2KiB", "8MiB", "512MiB", "32GiB", "64GiB"}
+		resourcesType := reflect.TypeOf(storiface.Resources{})
+
+		for _, sectorSize := range sectorSizes {
+			for i := 0; i < resourcesType.NumField(); i++ {
+				field := resourcesType.Field(i)
+				envName := field.Tag.Get("envname")
+				if envName != "" {
+					// Check if DC_[SectorSize]_[ResourceRestriction] is set
+					envVar, ok := os.LookupEnv("DC_" + sectorSize + "_" + envName)
+					if ok {
+						// If it is set, convert it to DC_[ResourceRestriction]
+						err := os.Setenv("DC_"+envName, envVar)
+						if err != nil {
+							log.Fatalf("Error setting environment variable: %v", err)
+						}
+						log.Warnf("Converted DC_%s_%s to DC_%s, because DC is a sector-size independent job", sectorSize, envName, envName)
+					}
+				}
+			}
+		}
+
 		// Connect to storage-miner
 		ctx := lcli.ReqContext(cctx)
 
@@ -603,7 +627,7 @@ var runCmd = &cli.Command{
 			Storage:    lr,
 		}
 
-		log.Info("Setting up control endpoint at " + address)
+		log.Info("Setting up control endpoint at " + newAddress)
 
 		timeout, err := time.ParseDuration(cctx.String("http-server-timeout"))
 		if err != nil {
@@ -628,13 +652,13 @@ var runCmd = &cli.Command{
 			log.Warn("Graceful shutdown successful")
 		}()
 
-		nl, err := net.Listen("tcp", address)
+		nl, err := net.Listen("tcp", newAddress)
 		if err != nil {
 			return err
 		}
 
 		{
-			a, err := net.ResolveTCPAddr("tcp", address)
+			a, err := net.ResolveTCPAddr("tcp", newAddress)
 			if err != nil {
 				return xerrors.Errorf("parsing address: %w", err)
 			}
@@ -715,7 +739,7 @@ var runCmd = &cli.Command{
 
 					select {
 					case <-readyCh:
-						if err := nodeApi.WorkerConnect(ctx, "http://"+address+"/rpc/v0"); err != nil {
+						if err := nodeApi.WorkerConnect(ctx, "http://"+newAddress+"/rpc/v0"); err != nil {
 							log.Errorf("Registering worker failed: %+v", err)
 							cancel()
 							return
@@ -777,15 +801,13 @@ func extractRoutableIP(timeout time.Duration) (string, error) {
 	}
 
 	minerIP, _ := maddr.ValueForProtocol(multiaddr.P_IP6)
+	if minerIP == "" {
+		minerIP, _ = maddr.ValueForProtocol(multiaddr.P_IP4)
+	}
 	minerPort, _ := maddr.ValueForProtocol(multiaddr.P_TCP)
 
-	// Check if the IP is IPv6 and format the address appropriately
-	var addressToDial string
-	if ip := net.ParseIP(minerIP); ip.To4() == nil && ip.To16() != nil {
-		addressToDial = "[" + minerIP + "]:" + minerPort
-	} else {
-		addressToDial = minerIP + ":" + minerPort
-	}
+	// Format the address appropriately
+	addressToDial := net.JoinHostPort(minerIP, minerPort)
 
 	conn, err := net.DialTimeout("tcp", addressToDial, timeout)
 	if err != nil {

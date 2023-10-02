@@ -562,7 +562,7 @@ func (m *Miner) mineOne(ctx context.Context, base *MiningBase) (minedBlock *type
 		return nil, err
 	}
 
-	tEquivocateWait := build.Clock.Now()
+	tPending := build.Clock.Now()
 
 	// This next block exists to "catch" equivocating miners,
 	// who submit 2 blocks at the same height at different times in order to split the network.
@@ -575,6 +575,8 @@ func (m *Miner) mineOne(ctx context.Context, base *MiningBase) (minedBlock *type
 		err = xerrors.Errorf("failed to refresh best mining candidate: %w", err)
 		return nil, err
 	}
+
+	tEquivocateWait := build.Clock.Now()
 
 	// If the base has changed, we take the _intersection_ of our old base and new base,
 	// thus ejecting blocks from any equivocating miners, without taking any new blocks.
@@ -621,7 +623,7 @@ func (m *Miner) mineOne(ctx context.Context, base *MiningBase) (minedBlock *type
 		}
 	}
 
-	tPending := build.Clock.Now()
+	tIntersectAndRefresh := build.Clock.Now()
 
 	// TODO: winning post proof
 	minedBlock, err = m.createBlock(base, m.address, ticket, winner, bvals, postProof, msgs)
@@ -637,15 +639,16 @@ func (m *Miner) mineOne(ctx context.Context, base *MiningBase) (minedBlock *type
 		parentMiners[i] = header.Miner
 	}
 	log.Infow("mined new block", "cid", minedBlock.Cid(), "height", int64(minedBlock.Header.Height), "miner", minedBlock.Header.Miner, "parents", parentMiners, "parentTipset", base.TipSet.Key().String(), "took", dur)
-	if dur > time.Second*time.Duration(build.BlockDelaySecs) {
-		log.Warnw("CAUTION: block production took longer than the block delay. Your computer may not be fast enough to keep up",
+	if dur > time.Second*time.Duration(build.BlockDelaySecs) || time.Now().Compare(time.Unix(int64(minedBlock.Header.Timestamp), 0)) >= 0 {
+		log.Warnw("CAUTION: block production took us past the block time. Your computer may not be fast enough to keep up",
 			"tPowercheck ", tPowercheck.Sub(tStart),
 			"tTicket ", tTicket.Sub(tPowercheck),
 			"tSeed ", tSeed.Sub(tTicket),
 			"tProof ", tProof.Sub(tSeed),
-			"tEquivocateWait ", tEquivocateWait.Sub(tProof),
-			"tPending ", tPending.Sub(tEquivocateWait),
-			"tCreateBlock ", tCreateBlock.Sub(tPending))
+			"tPending ", tPending.Sub(tProof),
+			"tEquivocateWait ", tEquivocateWait.Sub(tPending),
+			"tIntersectAndRefresh ", tIntersectAndRefresh.Sub(tEquivocateWait),
+			"tCreateBlock ", tCreateBlock.Sub(tIntersectAndRefresh))
 	}
 
 	return minedBlock, nil
