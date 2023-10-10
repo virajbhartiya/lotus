@@ -106,6 +106,14 @@ var disputerMsgCmd = &cli.Command{
 			Params: dpp,
 		}
 
+		// Estimate gas
+		estimatedMessage, err := api.GasEstimateMessageGas(ctx, dmsg, nil, types.EmptyTSK)
+		if err != nil {
+			fmt.Println("failed to estimate gas: ", err)
+		} else {
+			fmt.Println("Estimated gas: ", estimatedMessage.GasLimit)
+		}
+
 		rslt, err := api.StateCall(ctx, dmsg, types.EmptyTSK)
 		if err != nil {
 			return xerrors.Errorf("failed to simulate dispute: %w", err)
