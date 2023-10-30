@@ -2,11 +2,13 @@ package actors
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 
 	"github.com/ipfs/go-cid"
 	cbor "github.com/ipfs/go-ipld-cbor"
+	multihash "github.com/multiformats/go-multihash/core"
 	"golang.org/x/xerrors"
 
 	actorstypes "github.com/filecoin-project/go-state-types/actors"
@@ -15,8 +17,9 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/adt"
 )
 
-var manifestCids = make(map[actorstypes.Version]cid.Cid)
-var manifests = make(map[actorstypes.Version]map[string]cid.Cid)
+// XXX: FIXME FILL
+var manifestCids = make(map[string]cid.Cid)
+var manifests = make(map[string]map[string]cid.Cid)
 var actorMeta = make(map[cid.Cid]actorEntry)
 
 var (
@@ -25,7 +28,36 @@ var (
 
 type actorEntry struct {
 	name    string
+	tag     string
 	version actorstypes.Version
+}
+
+func legacyManifests() (map[string]map[string]cid.Cid, map[cid.Cid]actorEntry) {
+	manifests := make(map[string]map[string]cid.Cid)
+	metadata := make(map[cid.Cid]actorEntry)
+	builder := cid.V1Builder{Codec: cid.Raw, MhType: multihash.IDENTITY}
+	for i, v := range []actorstypes.Version{0, 2, 3, 4, 5, 6, 7} {
+		// TODO: use the correct tags? E.g., 0.9.1?
+		tag := fmt.Sprintf("v%d.0.0", v)
+		m := make(map[string]cid.Cid)
+		for _, key := range manifest.GetBuiltinActorsKeys(v) {
+			// We use i+1 because the first version is 0, but the version used in the
+			// name is 1.
+			cid, err := builder.Sum([]byte(fmt.Sprintf("fil/%d/%s", i+1, key)))
+			if err != nil {
+				panic(err)
+			}
+			m[key] = cid
+			metadata[cid] = actorEntry{
+				name:    key,
+				tag:     tag,
+				version: v,
+			}
+		}
+
+		manifests[tag] = m
+	}
+	return manifests, metadata
 }
 
 // ClearManifests clears all known manifests. This is usually used in tests that need to switch networks.
@@ -33,30 +65,29 @@ func ClearManifests() {
 	manifestMx.Lock()
 	defer manifestMx.Unlock()
 
-	manifestCids = make(map[actorstypes.Version]cid.Cid)
-	manifests = make(map[actorstypes.Version]map[string]cid.Cid)
-	actorMeta = make(map[cid.Cid]actorEntry)
+	manifestCids = make(map[string]cid.Cid)
+	manifests, actorMeta = legacyManifests()
 }
 
 // RegisterManifest registers an actors manifest with lotus.
-func RegisterManifest(av actorstypes.Version, manifestCid cid.Cid, entries map[string]cid.Cid) {
+func RegisterManifest(tag string, av actorstypes.Version, manifestCid cid.Cid, entries map[string]cid.Cid) {
 	manifestMx.Lock()
 	defer manifestMx.Unlock()
 
-	manifestCids[av] = manifestCid
-	manifests[av] = entries
+	manifestCids[tag] = manifestCid
+	manifests[tag] = entries
 
 	for name, c := range entries {
-		actorMeta[c] = actorEntry{name: name, version: av}
+		actorMeta[c] = actorEntry{name: name, tag: tag, version: av}
 	}
 }
 
 // GetManifest gets a loaded manifest.
-func GetManifest(av actorstypes.Version) (cid.Cid, bool) {
+func GetManifest(tag string) (cid.Cid, bool) {
 	manifestMx.RLock()
 	defer manifestMx.RUnlock()
 
-	c, ok := manifestCids[av]
+	c, ok := manifestCids[tag]
 	return c, ok
 }
 
@@ -86,13 +117,23 @@ func ReadManifest(ctx context.Context, store cbor.IpldStore, mfCid cid.Cid) (map
 	return metadata, nil
 }
 
-// GetActorCodeIDsFromManifest looks up all builtin actor's code CIDs by actor version for versions that have a manifest.
-func GetActorCodeIDsFromManifest(av actorstypes.Version) (map[string]cid.Cid, bool) {
+// GetActorCodeIDs looks up all builtin actor's code CIDs by actor release tag.
+func GetActorCodeIDs(tag string) (map[string]cid.Cid, bool) {
 	manifestMx.RLock()
 	defer manifestMx.RUnlock()
 
-	cids, ok := manifests[av]
+	cids, ok := manifests[tag]
 	return cids, ok
+}
+
+// GetActorCodeID looks up a builtin actor's code CID by actor tag and canonical actor name.
+func GetActorCodeID(tag string, name string) (cid.Cid, bool) {
+	cids, ok := GetActorCodeIDs(tag)
+	if !ok {
+		return cid.Undef, false
+	}
+	cid, ok := cids[name]
+	return cid, ok
 }
 
 // Given a Manifest CID, get the manifest from the store and Load data into its entries
@@ -110,16 +151,22 @@ func LoadManifest(ctx context.Context, mfCid cid.Cid, adtStore adt.Store) (*mani
 	return &mf, nil
 }
 
-func GetActorMetaByCode(c cid.Cid) (string, actorstypes.Version, bool) {
+// GetActorMetaByCode returns the:
+//
+// - Actor name
+// - Actor "git tag" (code version)
+// - Actor Version (API version)
+// - A boolean indicating whether or not the actor was found.
+func GetActorMetaByCode(c cid.Cid) (string, string, actorstypes.Version, bool) {
 	manifestMx.RLock()
 	defer manifestMx.RUnlock()
 
 	entry, ok := actorMeta[c]
 	if !ok {
-		return "", -1, false
+		return "", "", -1, false
 	}
 
-	return entry.name, entry.version, true
+	return entry.name, entry.tag, entry.version, true
 }
 
 func CanonicalName(name string) string {

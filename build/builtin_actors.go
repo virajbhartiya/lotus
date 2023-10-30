@@ -88,7 +88,7 @@ func loadManifests(netw string) error {
 	actors.ClearManifests()
 
 	for _, meta := range newMetadata {
-		actors.RegisterManifest(meta.Version, meta.ManifestCid, meta.Actors)
+		actors.RegisterManifest(meta.BundleGitTag, meta.Version, meta.ManifestCid, meta.Actors)
 	}
 
 	return nil

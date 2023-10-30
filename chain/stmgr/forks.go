@@ -92,10 +92,11 @@ type PreMigration struct {
 }
 
 type Upgrade struct {
-	Height    abi.ChainEpoch
-	Network   network.Version
-	Expensive bool
-	Migration MigrationFunc
+	Height            abi.ChainEpoch
+	Network           network.Version
+	Expensive         bool
+	Migration         MigrationFunc
+	ActorBundleGitTag string
 
 	// PreMigrations specifies a set of pre-migration functions to run at the indicated epochs.
 	// These functions should fill the given cache with information that can speed up the

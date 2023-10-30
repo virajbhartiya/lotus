@@ -30,9 +30,9 @@ func init() {
 	GovernorId = idk
 }
 
-func SetupDatacapActor(ctx context.Context, bs bstore.Blockstore, av actorstypes.Version) (*types.Actor, error) {
+func SetupDatacapActor(ctx context.Context, bs bstore.Blockstore, actorsTag string) (*types.Actor, error) {
 	cst := cbor.NewCborStore(bs)
-	dst, err := datacap.MakeState(adt.WrapStore(ctx, cbor.NewCborStore(bs)), av, GovernorId, builtin.DefaultTokenActorBitwidth)
+	dst, err := datacap.MakeState(adt.WrapStore(ctx, cbor.NewCborStore(bs)), actorsTag, GovernorId, builtin.DefaultTokenActorBitwidth)
 	if err != nil {
 		return nil, err
 	}

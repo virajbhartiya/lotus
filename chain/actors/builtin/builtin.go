@@ -58,7 +58,7 @@ func QAPowerForWeight(size abi.SectorSize, duration abi.ChainEpoch, dealWeight, 
 }
 
 func ActorNameByCode(c cid.Cid) string {
-	if name, version, ok := actors.GetActorMetaByCode(c); ok {
+	if name, _, version, ok := actors.GetActorMetaByCode(c); ok {
 		return fmt.Sprintf("fil/%d/%s", version, name)
 	}
 
@@ -91,7 +91,7 @@ func ActorNameByCode(c cid.Cid) string {
 }
 
 func IsBuiltinActor(c cid.Cid) bool {
-	_, _, ok := actors.GetActorMetaByCode(c)
+	_, _, _, ok := actors.GetActorMetaByCode(c)
 	if ok {
 		return true
 	}
@@ -128,7 +128,7 @@ func IsBuiltinActor(c cid.Cid) bool {
 }
 
 func IsAccountActor(c cid.Cid) bool {
-	name, _, ok := actors.GetActorMetaByCode(c)
+	name, _, _, ok := actors.GetActorMetaByCode(c)
 	if ok {
 		return name == "account"
 	}
@@ -165,7 +165,7 @@ func IsAccountActor(c cid.Cid) bool {
 }
 
 func IsStorageMinerActor(c cid.Cid) bool {
-	name, _, ok := actors.GetActorMetaByCode(c)
+	name, _, _, ok := actors.GetActorMetaByCode(c)
 	if ok {
 		return name == manifest.MinerKey
 	}
@@ -202,7 +202,7 @@ func IsStorageMinerActor(c cid.Cid) bool {
 }
 
 func IsMultisigActor(c cid.Cid) bool {
-	name, _, ok := actors.GetActorMetaByCode(c)
+	name, _, _, ok := actors.GetActorMetaByCode(c)
 	if ok {
 		return name == manifest.MultisigKey
 	}
@@ -239,7 +239,7 @@ func IsMultisigActor(c cid.Cid) bool {
 }
 
 func IsPaymentChannelActor(c cid.Cid) bool {
-	name, _, ok := actors.GetActorMetaByCode(c)
+	name, _, _, ok := actors.GetActorMetaByCode(c)
 	if ok {
 		return name == "paymentchannel"
 	}
@@ -276,7 +276,7 @@ func IsPaymentChannelActor(c cid.Cid) bool {
 }
 
 func IsPlaceholderActor(c cid.Cid) bool {
-	name, _, ok := actors.GetActorMetaByCode(c)
+	name, _, _, ok := actors.GetActorMetaByCode(c)
 	if ok {
 		return name == manifest.PlaceholderKey
 	}
@@ -285,7 +285,7 @@ func IsPlaceholderActor(c cid.Cid) bool {
 }
 
 func IsEvmActor(c cid.Cid) bool {
-	name, _, ok := actors.GetActorMetaByCode(c)
+	name, _, _, ok := actors.GetActorMetaByCode(c)
 	if ok {
 		return name == manifest.EvmKey
 	}
@@ -294,7 +294,7 @@ func IsEvmActor(c cid.Cid) bool {
 }
 
 func IsEthAccountActor(c cid.Cid) bool {
-	name, _, ok := actors.GetActorMetaByCode(c)
+	name, _, _, ok := actors.GetActorMetaByCode(c)
 	if ok {
 		return name == manifest.EthAccountKey
 	}
