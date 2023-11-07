@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/filecoin-project/go-state-types/manifest"
+
 	badgerbs "github.com/filecoin-project/lotus/blockstore/badger"
 	"github.com/filecoin-project/lotus/blockstore/splitstore"
 
@@ -144,6 +146,8 @@ var invariantsCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
+
+		actorCodeCids[manifest.MinerKey] = cid.MustParse("bafk2bzacecnh2ouohmonvebq7uughh4h3ppmg4cjsk74dzxlbbtlcij4xbzxq")
 
 		actorStore := store.ActorStore(ctx, blockstore.NewTieredBstore(bs, blockstore.NewMemorySync()))
 
