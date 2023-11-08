@@ -199,6 +199,7 @@ func NewStateManager(cs *store.ChainStore, exec Executor, sys vm.SyscallBuilder,
 				}
 
 				stateMigrations[upgrade.Height] = migration
+				fmt.Println("added a migration at ", upgrade.Height)
 			}
 			if upgrade.Expensive {
 				expensiveUpgrades[upgrade.Height] = struct{}{}
@@ -211,6 +212,8 @@ func NewStateManager(cs *store.ChainStore, exec Executor, sys vm.SyscallBuilder,
 			lastVersion = upgrade.Network
 		}
 	}
+
+	fmt.Println("migration count ", len(stateMigrations))
 
 	log.Debugf("execTraceCache size: %d", execTraceCacheSize)
 	var execTraceCache *lru.ARCCache[types.TipSetKey, tipSetCacheEntry]

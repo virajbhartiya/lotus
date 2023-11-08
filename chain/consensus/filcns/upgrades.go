@@ -277,7 +277,7 @@ func DefaultUpgradeSchedule() stmgr.UpgradeSchedule {
 		}},
 		Expensive: true,
 	}, {
-		Height:    build.UpgradeWatermelonFixHeight,
+		Height:    25,
 		Network:   network.Version21,
 		Migration: upgradeActorsV12Fix,
 	},
@@ -288,6 +288,8 @@ func DefaultUpgradeSchedule() stmgr.UpgradeSchedule {
 			// upgrade disabled
 			continue
 		}
+
+		fmt.Println("setting an upgrade at height ", u.Height, " for ", u.Network)
 		us = append(us, u)
 	}
 	return us
@@ -1858,6 +1860,7 @@ func PreUpgradeActorsV12(ctx context.Context, sm *stmgr.StateManager, cache stmg
 
 func UpgradeActorsV12(ctx context.Context, sm *stmgr.StateManager, cache stmgr.MigrationCache, cb stmgr.ExecMonitor,
 	root cid.Cid, epoch abi.ChainEpoch, ts *types.TipSet) (cid.Cid, error) {
+	fmt.Println("Rebuild try 1")
 	// Use all the CPUs except 2.
 	workerCount := MigrationMaxWorkerCount - 3
 	if workerCount <= 0 {
@@ -1876,7 +1879,7 @@ func UpgradeActorsV12(ctx context.Context, sm *stmgr.StateManager, cache stmgr.M
 	return newRoot, nil
 }
 
-var calibnetv12BuggyBundle = cid.MustParse("bafy2bzacedrunxfqta5skb7q7x32lnp4efz2oq7fn226ffm7fu5iqs62jkmvs")
+var calibnetv12BuggyBundle = cid.MustParse("bafy2bzacebk6yiirh4ennphzyka7b6g6jzn3lt4lr5ht7rjwulnrcthjihapo")
 
 func upgradeActorsV12Common(
 	ctx context.Context, sm *stmgr.StateManager, cache stmgr.MigrationCache,
@@ -1922,8 +1925,8 @@ func upgradeActorsV12Common(
 	}
 
 	var manifestCid cid.Cid
-	if initState.NetworkName == "calibrationnet" {
-		embedded, ok := build.GetEmbeddedBuiltinActorsBundle(actorstypes.Version12, "calibrationnet-buggy")
+	if initState.NetworkName != "mainnet" {
+		embedded, ok := build.GetEmbeddedBuiltinActorsBundle(actorstypes.Version12, "devnet-buggy")
 		if !ok {
 			return cid.Undef, xerrors.Errorf("didn't find buggy calibrationnet bundle")
 		}
@@ -1976,10 +1979,11 @@ func upgradeActorsV12Common(
 
 //////////////////////
 
-var calibnetv12BuggyMinerCID = cid.MustParse("bafk2bzacecnh2ouohmonvebq7uughh4h3ppmg4cjsk74dzxlbbtlcij4xbzxq")
+var calibnetv12BuggyMinerCID = cid.MustParse("bafk2bzaceajgt523lr2sf6cacvzo3goyalljlkaoeehyhxlv57wevkljw2cps")
 
 func upgradeActorsV12Fix(ctx context.Context, sm *stmgr.StateManager, cache stmgr.MigrationCache, cb stmgr.ExecMonitor,
 	root cid.Cid, epoch abi.ChainEpoch, ts *types.TipSet) (cid.Cid, error) {
+	fmt.Println("RUNNING THE FIX")
 	stateStore := sm.ChainStore().StateBlockstore()
 	adtStore := store.ActorStore(ctx, stateStore)
 
@@ -2033,6 +2037,7 @@ func upgradeActorsV12Fix(ctx context.Context, sm *stmgr.StateManager, cache stmg
 			return cid.Undef, xerrors.Errorf("missing manifest entry for %s", oldEntry.Name)
 		}
 
+		fmt.Println("a new CID is ", newCID)
 		// Note: we expect newCID to be the same as oldEntry.Code for all actors except the miner actor
 		codeMapping[oldEntry.Code] = newCID
 	}
@@ -2051,6 +2056,8 @@ func upgradeActorsV12Fix(ctx context.Context, sm *stmgr.StateManager, cache stmg
 			return xerrors.Errorf("didn't find mapping for %s", actor.Code)
 		}
 
+		fmt.Println("MIGRATING ", a, " to ", newCid)
+
 		return actorsOut.SetActor(a, &types.ActorV5{
 			Code:    newCid,
 			Head:    actor.Head,
@@ -2064,7 +2071,7 @@ func upgradeActorsV12Fix(ctx context.Context, sm *stmgr.StateManager, cache stmg
 	}
 
 	systemState.BuiltinActors = newManifest.Data
-	newSystemHead, err := adtStore.Put(ctx, systemState)
+	newSystemHead, err := adtStore.Put(ctx, &systemState)
 	if err != nil {
 		return cid.Undef, xerrors.Errorf("failed to put new system state: %w", err)
 	}
@@ -2094,7 +2101,7 @@ func upgradeActorsV12Fix(ctx context.Context, sm *stmgr.StateManager, cache stmg
 			return xerrors.Errorf("mismatched address for actor %s: %s != %s", a, inActor.Address, outActor.Address)
 		}
 
-		if inActor.Head != outActor.Head {
+		if inActor.Head != outActor.Head && a != builtin.SystemActorAddr {
 			return xerrors.Errorf("mismatched head for actor %s", a)
 		}
 
