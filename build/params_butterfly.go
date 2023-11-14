@@ -55,13 +55,11 @@ const UpgradeHyggeHeight = -21
 const UpgradeLightningHeight = -22
 const UpgradeThunderHeight = -23
 
-const UpgradeWatermelonHeight = 400
+const UpgradeWatermelonHeight = 100
 
-// This fix upgrade only ran on calibrationnet
-const UpgradeWatermelonFixHeight = -100
+const UpgradeWatermelonFixHeight = 300
 
-// This fix upgrade only ran on calibrationnet
-const UpgradeWatermelonFix2Height = -101
+const UpgradeWatermelonFix2Height = 500
 
 var SupportedProofTypes = []abi.RegisteredSealProof{
 	abi.RegisteredSealProof_StackedDrg512MiBV1,

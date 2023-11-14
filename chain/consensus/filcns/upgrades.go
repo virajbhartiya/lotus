@@ -1882,15 +1882,15 @@ func UpgradeActorsV12(ctx context.Context, sm *stmgr.StateManager, cache stmgr.M
 }
 
 var (
-	calibnetv12BuggyMinerCID1 = cid.MustParse("bafk2bzacecnh2ouohmonvebq7uughh4h3ppmg4cjsk74dzxlbbtlcij4xbzxq")
-	calibnetv12BuggyMinerCID2 = cid.MustParse("bafk2bzaced7emkbbnrewv5uvrokxpf5tlm4jslu2jsv77ofw2yqdglg657uie")
+	calibnetv12BuggyMinerCID1 = cid.MustParse("bafk2bzaceaaztuglvw6pw5xohwfekbw47iyugbyftxrp6hwygsaiu6rebtcty")
+	calibnetv12BuggyMinerCID2 = cid.MustParse("bafk2bzacea2jzzulmz6ktj6vndjheybz2io3vznnhsb32zberpaqeo7s7xa56")
 
-	calibnetv12BuggyBundleSuffix1 = "calibrationnet-12-rc1"
-	calibnetv12BuggyBundleSuffix2 = "calibrationnet-12-rc2"
+	calibnetv12BuggyBundleSuffix1 = "butterflynet-12-rc1"
+	calibnetv12BuggyBundleSuffix2 = "butterflynet-12-rc2"
 
-	calibnetv12BuggyManifestCID1   = cid.MustParse("bafy2bzacedrunxfqta5skb7q7x32lnp4efz2oq7fn226ffm7fu5iqs62jkmvs")
-	calibnetv12BuggyManifestCID2   = cid.MustParse("bafy2bzacebl4w5ptfvuw6746w7ev562idkbf5ppq72e6zub22435ws2rukzru")
-	calibnetv12CorrectManifestCID1 = cid.MustParse("bafy2bzacednzb3pkrfnbfhmoqtb3bc6dgvxszpqklf3qcc7qzcage4ewzxsca")
+	calibnetv12BuggyManifestCID1   = cid.MustParse("bafy2bzaceb7s3k6zyuubqil7s2rwdcdyslqqx2fn2cj536yh3hexlyi4syyk6")
+	calibnetv12BuggyManifestCID2   = cid.MustParse("bafy2bzaceabeegs5mhrxwqodyt7u2ulxr2jg6eh5g3545ganqzkncnxzserue")
+	calibnetv12CorrectManifestCID1 = cid.MustParse("bafy2bzacectxvbk77ntedhztd6sszp2btrtvsmy7lp2ypnrk6yl74zb34t2cq")
 )
 
 func upgradeActorsV12Common(
@@ -1937,28 +1937,27 @@ func upgradeActorsV12Common(
 	}
 
 	var manifestCid cid.Cid
-	if initState.NetworkName == "calibrationnet" {
-		embedded, ok := build.GetEmbeddedBuiltinActorsBundle(actorstypes.Version12, calibnetv12BuggyBundleSuffix1)
-		if !ok {
-			return cid.Undef, xerrors.Errorf("didn't find buggy calibrationnet bundle")
-		}
-
-		var err error
-		manifestCid, err = bundle.LoadBundle(ctx, writeStore, bytes.NewReader(embedded))
-		if err != nil {
-			return cid.Undef, xerrors.Errorf("failed to load buggy calibnet bundle: %w", err)
-		}
-
-		if manifestCid != calibnetv12BuggyManifestCID1 {
-			return cid.Undef, xerrors.Errorf("didn't find expected buggy calibnet bundle manifest: %s != %s", manifestCid, calibnetv12BuggyManifestCID1)
-		}
-	} else {
-		ok := false
-		manifestCid, ok = actors.GetManifest(actorstypes.Version12)
-		if !ok {
-			return cid.Undef, xerrors.Errorf("no manifest CID for v12 upgrade")
-		}
+	//if initState.NetworkName == "calibrationnet" {
+	embedded, ok := build.GetEmbeddedBuiltinActorsBundle(actorstypes.Version12, calibnetv12BuggyBundleSuffix1)
+	if !ok {
+		return cid.Undef, xerrors.Errorf("didn't find first buggy calibrationnet bundle")
 	}
+
+	manifestCid, err = bundle.LoadBundle(ctx, writeStore, bytes.NewReader(embedded))
+	if err != nil {
+		return cid.Undef, xerrors.Errorf("failed to load buggy calibnet bundle: %w", err)
+	}
+
+	if manifestCid != calibnetv12BuggyManifestCID1 {
+		return cid.Undef, xerrors.Errorf("didn't find expected buggy calibnet bundle manifest: %s != %s", manifestCid, calibnetv12BuggyManifestCID1)
+	}
+	//} else {
+	//	ok := false
+	//	manifestCid, ok = actors.GetManifest(actorstypes.Version12)
+	//	if !ok {
+	//		return cid.Undef, xerrors.Errorf("no manifest CID for v12 upgrade")
+	//	}
+	//}
 
 	// Perform the migration
 	newHamtRoot, err := nv21.MigrateStateTree(ctx, adtStore, manifestCid, stateRoot.Actors, epoch, config,
@@ -2005,7 +2004,7 @@ func buildUpgradeActorsV12MinerFix(oldBuggyMinerCID, newManifestCID cid.Cid) fun
 		// this loads the second buggy bundle, for UpgradeWatermelonFixHeight
 		embedded, ok := build.GetEmbeddedBuiltinActorsBundle(actorstypes.Version12, calibnetv12BuggyBundleSuffix2)
 		if !ok {
-			return cid.Undef, xerrors.Errorf("didn't find buggy calibrationnet bundle")
+			return cid.Undef, xerrors.Errorf("didn't find second buggy calibrationnet bundle")
 		}
 
 		_, err := bundle.LoadBundle(ctx, stateStore, bytes.NewReader(embedded))
