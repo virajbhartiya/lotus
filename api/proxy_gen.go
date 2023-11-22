@@ -255,6 +255,10 @@ type FullNodeMethods struct {
 
 	EthChainId func(p0 context.Context) (ethtypes.EthUint64, error) `perm:"read"`
 
+	EthDebugTraceBlockByNumber func(p0 context.Context, p1 string) ([]*ethtypes.EthDebugTraceBlockByNumber, error) `perm:"read"`
+
+	EthDebugTraceTransaction func(p0 context.Context, p1 ethtypes.EthHash) (*ethtypes.EthDebugTraceTransaction, error) `perm:"read"`
+
 	EthEstimateGas func(p0 context.Context, p1 ethtypes.EthCall) (ethtypes.EthUint64, error) `perm:"read"`
 
 	EthFeeHistory func(p0 context.Context, p1 jsonrpc.RawParams) (ethtypes.EthFeeHistory, error) `perm:"read"`
@@ -678,6 +682,10 @@ type GatewayMethods struct {
 	EthCall func(p0 context.Context, p1 ethtypes.EthCall, p2 ethtypes.EthBlockNumberOrHash) (ethtypes.EthBytes, error) ``
 
 	EthChainId func(p0 context.Context) (ethtypes.EthUint64, error) ``
+
+	EthDebugTraceBlockByNumber func(p0 context.Context, p1 string) ([]*ethtypes.EthDebugTraceBlockByNumber, error) ``
+
+	EthDebugTraceTransaction func(p0 context.Context, p1 ethtypes.EthHash) (*ethtypes.EthDebugTraceTransaction, error) ``
 
 	EthEstimateGas func(p0 context.Context, p1 ethtypes.EthCall) (ethtypes.EthUint64, error) ``
 
@@ -2132,6 +2140,28 @@ func (s *FullNodeStruct) EthChainId(p0 context.Context) (ethtypes.EthUint64, err
 
 func (s *FullNodeStub) EthChainId(p0 context.Context) (ethtypes.EthUint64, error) {
 	return *new(ethtypes.EthUint64), ErrNotSupported
+}
+
+func (s *FullNodeStruct) EthDebugTraceBlockByNumber(p0 context.Context, p1 string) ([]*ethtypes.EthDebugTraceBlockByNumber, error) {
+	if s.Internal.EthDebugTraceBlockByNumber == nil {
+		return *new([]*ethtypes.EthDebugTraceBlockByNumber), ErrNotSupported
+	}
+	return s.Internal.EthDebugTraceBlockByNumber(p0, p1)
+}
+
+func (s *FullNodeStub) EthDebugTraceBlockByNumber(p0 context.Context, p1 string) ([]*ethtypes.EthDebugTraceBlockByNumber, error) {
+	return *new([]*ethtypes.EthDebugTraceBlockByNumber), ErrNotSupported
+}
+
+func (s *FullNodeStruct) EthDebugTraceTransaction(p0 context.Context, p1 ethtypes.EthHash) (*ethtypes.EthDebugTraceTransaction, error) {
+	if s.Internal.EthDebugTraceTransaction == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.EthDebugTraceTransaction(p0, p1)
+}
+
+func (s *FullNodeStub) EthDebugTraceTransaction(p0 context.Context, p1 ethtypes.EthHash) (*ethtypes.EthDebugTraceTransaction, error) {
+	return nil, ErrNotSupported
 }
 
 func (s *FullNodeStruct) EthEstimateGas(p0 context.Context, p1 ethtypes.EthCall) (ethtypes.EthUint64, error) {
@@ -4398,6 +4428,28 @@ func (s *GatewayStruct) EthChainId(p0 context.Context) (ethtypes.EthUint64, erro
 
 func (s *GatewayStub) EthChainId(p0 context.Context) (ethtypes.EthUint64, error) {
 	return *new(ethtypes.EthUint64), ErrNotSupported
+}
+
+func (s *GatewayStruct) EthDebugTraceBlockByNumber(p0 context.Context, p1 string) ([]*ethtypes.EthDebugTraceBlockByNumber, error) {
+	if s.Internal.EthDebugTraceBlockByNumber == nil {
+		return *new([]*ethtypes.EthDebugTraceBlockByNumber), ErrNotSupported
+	}
+	return s.Internal.EthDebugTraceBlockByNumber(p0, p1)
+}
+
+func (s *GatewayStub) EthDebugTraceBlockByNumber(p0 context.Context, p1 string) ([]*ethtypes.EthDebugTraceBlockByNumber, error) {
+	return *new([]*ethtypes.EthDebugTraceBlockByNumber), ErrNotSupported
+}
+
+func (s *GatewayStruct) EthDebugTraceTransaction(p0 context.Context, p1 ethtypes.EthHash) (*ethtypes.EthDebugTraceTransaction, error) {
+	if s.Internal.EthDebugTraceTransaction == nil {
+		return nil, ErrNotSupported
+	}
+	return s.Internal.EthDebugTraceTransaction(p0, p1)
+}
+
+func (s *GatewayStub) EthDebugTraceTransaction(p0 context.Context, p1 ethtypes.EthHash) (*ethtypes.EthDebugTraceTransaction, error) {
+	return nil, ErrNotSupported
 }
 
 func (s *GatewayStruct) EthEstimateGas(p0 context.Context, p1 ethtypes.EthCall) (ethtypes.EthUint64, error) {

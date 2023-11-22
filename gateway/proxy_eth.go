@@ -606,6 +606,26 @@ func (gw *Node) EthTraceReplayBlockTransactions(ctx context.Context, blkNum stri
 	return gw.target.EthTraceReplayBlockTransactions(ctx, blkNum, traceTypes)
 }
 
+func (gw *Node) EthDebugTraceBlockByNumber(ctx context.Context, blkNum string) ([]*ethtypes.EthDebugTraceBlockByNumber, error) {
+	if err := gw.limit(ctx, stateRateLimitTokens); err != nil {
+		return nil, err
+	}
+
+	if err := gw.checkBlkParam(ctx, blkNum, 0); err != nil {
+		return nil, err
+	}
+
+	return gw.target.EthDebugTraceBlockByNumber(ctx, blkNum)
+}
+
+func (gw *Node) EthDebugTraceTransaction(ctx context.Context, txHash ethtypes.EthHash) (*ethtypes.EthDebugTraceTransaction, error) {
+	if err := gw.limit(ctx, stateRateLimitTokens); err != nil {
+		return nil, err
+	}
+
+	return gw.target.EthDebugTraceTransaction(ctx, txHash)
+}
+
 var EthMaxFiltersPerConn = 16 // todo make this configurable
 
 func addUserFilterLimited(ctx context.Context, cb func() (ethtypes.EthFilterID, error)) (ethtypes.EthFilterID, error) {

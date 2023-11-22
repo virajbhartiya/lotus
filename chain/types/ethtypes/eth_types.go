@@ -984,3 +984,22 @@ type EthTraceResult struct {
 	GasUsed EthUint64 `json:"gasUsed"`
 	Output  EthBytes  `json:"output"`
 }
+
+type EthDebug struct {
+	Type    string                        `json:"type"`
+	From    EthAddress                    `json:"from"`
+	To      EthAddress                    `json:"to"`
+	Gas     EthUint64                     `json:"gas"`
+	GasUsed EthUint64                     `json:"gasUsed"`
+	Input   EthBytes                      `json:"input"`
+	Output  EthBytes                      `json:"output"`
+	Value   EthBigInt                     `json:"value"`
+	Calls   []*EthDebugTraceBlockByNumber `json:"calls"`
+}
+type EthDebugTraceBlockByNumber struct {
+	*EthDebug
+}
+
+type EthDebugTraceTransaction struct {
+	*EthDebug
+}

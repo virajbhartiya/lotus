@@ -1041,6 +1041,36 @@ func (mr *MockFullNodeMockRecorder) EthChainId(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EthChainId", reflect.TypeOf((*MockFullNode)(nil).EthChainId), arg0)
 }
 
+// EthDebugTraceBlockByNumber mocks base method.
+func (m *MockFullNode) EthDebugTraceBlockByNumber(arg0 context.Context, arg1 string) ([]*ethtypes.EthDebugTraceBlockByNumber, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EthDebugTraceBlockByNumber", arg0, arg1)
+	ret0, _ := ret[0].([]*ethtypes.EthDebugTraceBlockByNumber)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// EthDebugTraceBlockByNumber indicates an expected call of EthDebugTraceBlockByNumber.
+func (mr *MockFullNodeMockRecorder) EthDebugTraceBlockByNumber(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EthDebugTraceBlockByNumber", reflect.TypeOf((*MockFullNode)(nil).EthDebugTraceBlockByNumber), arg0, arg1)
+}
+
+// EthDebugTraceTransaction mocks base method.
+func (m *MockFullNode) EthDebugTraceTransaction(arg0 context.Context, arg1 ethtypes.EthHash) (*ethtypes.EthDebugTraceTransaction, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EthDebugTraceTransaction", arg0, arg1)
+	ret0, _ := ret[0].(*ethtypes.EthDebugTraceTransaction)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// EthDebugTraceTransaction indicates an expected call of EthDebugTraceTransaction.
+func (mr *MockFullNodeMockRecorder) EthDebugTraceTransaction(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EthDebugTraceTransaction", reflect.TypeOf((*MockFullNode)(nil).EthDebugTraceTransaction), arg0, arg1)
+}
+
 // EthEstimateGas mocks base method.
 func (m *MockFullNode) EthEstimateGas(arg0 context.Context, arg1 ethtypes.EthCall) (ethtypes.EthUint64, error) {
 	m.ctrl.T.Helper()

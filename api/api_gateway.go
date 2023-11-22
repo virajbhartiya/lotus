@@ -129,4 +129,6 @@ type Gateway interface {
 	Web3ClientVersion(ctx context.Context) (string, error)
 	EthTraceBlock(ctx context.Context, blkNum string) ([]*ethtypes.EthTraceBlock, error)
 	EthTraceReplayBlockTransactions(ctx context.Context, blkNum string, traceTypes []string) ([]*ethtypes.EthTraceReplayBlockTransaction, error)
+	EthDebugTraceBlockByNumber(ctx context.Context, blkNum string) ([]*ethtypes.EthDebugTraceBlockByNumber, error)
+	EthDebugTraceTransaction(ctx context.Context, txHash ethtypes.EthHash) (*ethtypes.EthDebugTraceTransaction, error)
 }

@@ -186,5 +186,13 @@ func (e *EthModuleDummy) EthTraceReplayBlockTransactions(ctx context.Context, bl
 	return nil, ErrModuleDisabled
 }
 
+func (e *EthModuleDummy) EthDebugTraceBlockByNumber(ctx context.Context, blkNum string) ([]*ethtypes.EthDebugTraceBlockByNumber, error) {
+	return nil, ErrModuleDisabled
+}
+
+func (e *EthModuleDummy) EthDebugTraceTransaction(ctx context.Context, txHash ethtypes.EthHash) (*ethtypes.EthDebugTraceTransaction, error) {
+	return nil, ErrModuleDisabled
+}
+
 var _ EthModuleAPI = &EthModuleDummy{}
 var _ EthEventAPI = &EthModuleDummy{}

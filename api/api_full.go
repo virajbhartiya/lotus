@@ -874,6 +874,11 @@ type FullNode interface {
 	// Replays all transactions in a block returning the requested traces for each transaction
 	EthTraceReplayBlockTransactions(ctx context.Context, blkNum string, traceTypes []string) ([]*ethtypes.EthTraceReplayBlockTransaction, error) //perm:read
 
+	// DebugAPI related methods
+	//
+	EthDebugTraceBlockByNumber(ctx context.Context, blkNum string) ([]*ethtypes.EthDebugTraceBlockByNumber, error)     //perm:read
+	EthDebugTraceTransaction(ctx context.Context, txHash ethtypes.EthHash) (*ethtypes.EthDebugTraceTransaction, error) //perm:read
+
 	// CreateBackup creates node backup onder the specified file name. The
 	// method requires that the lotus daemon is running with the
 	// LOTUS_BACKUP_BASE_PATH environment variable set to some path, and that

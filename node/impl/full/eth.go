@@ -73,6 +73,8 @@ type EthModuleAPI interface {
 	Web3ClientVersion(ctx context.Context) (string, error)
 	EthTraceBlock(ctx context.Context, blkNum string) ([]*ethtypes.EthTraceBlock, error)
 	EthTraceReplayBlockTransactions(ctx context.Context, blkNum string, traceTypes []string) ([]*ethtypes.EthTraceReplayBlockTransaction, error)
+	EthDebugTraceBlockByNumber(ctx context.Context, blkNum string) ([]*ethtypes.EthDebugTraceBlockByNumber, error)
+	EthDebugTraceTransaction(ctx context.Context, txHash ethtypes.EthHash) (*ethtypes.EthDebugTraceTransaction, error)
 }
 
 type EthEventAPI interface {
@@ -828,6 +830,37 @@ func (a *EthModule) EthSendRawTransaction(ctx context.Context, rawTx ethtypes.Et
 
 func (a *EthModule) Web3ClientVersion(ctx context.Context) (string, error) {
 	return build.UserVersion(), nil
+}
+
+func (a *EthModule) EthDebugTraceBlockByNumber(ctx context.Context, blkNum string) ([]*ethtypes.EthDebugTraceBlockByNumber, error) {
+	traces, err := a.EthTraceBlock(ctx, blkNum)
+	if err != nil {
+		return nil, xerrors.Errorf("failed to get traces: %w", err)
+	}
+
+	allTraces := make([]*ethtypes.EthDebugTraceBlockByNumber, 0, len(traces))
+	for _, t := range traces {
+		debugTrace := &ethtypes.EthDebugTraceBlockByNumber{
+			EthDebug: &ethtypes.EthDebug{
+				Type:    t.Type,
+				From:    t.Action.From,
+				To:      t.Action.To,
+				Gas:     t.Action.Gas,
+				GasUsed: t.Result.GasUsed,
+				Input:   t.Action.Input,
+				Output:  t.Result.Output,
+				Value:   t.Action.Value,
+			},
+		}
+
+		allTraces = append(allTraces, debugTrace)
+	}
+
+	return allTraces, nil
+}
+
+func (a *EthModule) EthDebugTraceTransaction(ctx context.Context, txHash ethtypes.EthHash) (*ethtypes.EthDebugTraceTransaction, error) {
+	return nil, nil
 }
 
 func (a *EthModule) EthTraceBlock(ctx context.Context, blkNum string) ([]*ethtypes.EthTraceBlock, error) {
