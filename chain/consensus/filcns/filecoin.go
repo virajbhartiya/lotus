@@ -53,6 +53,11 @@ type FilecoinEC struct {
 	verifier storiface.Verifier
 
 	genesis *types.TipSet
+
+	// jiejie: 我们client维护的一些states可以记录在这里
+	lastFinalizedEpoch        int64
+	lastGraniteInstanceNumber int64
+	powerTable                types.PowerTable
 }
 
 // Blocks that are more than MaxHeightDrift epochs above
@@ -110,6 +115,8 @@ func NewFilecoinExpectedConsensus(sm *stmgr.StateManager, beacon beacon.Schedule
 	}
 }
 
+// jiejie: 这里是EC validate block的入口
+// jiejie: 这里其实只是validate block的header而已，并没有validate block的messages（message不去执行本来也没什么可以validate的）
 func (filec *FilecoinEC) ValidateBlock(ctx context.Context, b *types.FullBlock) (err error) {
 	if err := blockSanityChecks(b.Header); err != nil {
 		return xerrors.Errorf("incoming header failed basic sanity checks: %w", err)
@@ -399,6 +406,25 @@ func (filec *FilecoinEC) IsEpochInConsensusRange(epoch abi.ChainEpoch) bool {
 
 	now := uint64(build.Clock.Now().Unix())
 	return epoch <= (abi.ChainEpoch((now-filec.genesis.MinTimestamp())/build.BlockDelaySecs) + MaxHeightDrift)
+}
+
+func (filec *FilecoinEC) ValidateFinalityCertificate(ctx context.Context, b *types.FullBlock) error {
+	h := b.Header
+	if h.FinalityCertificate == nil {
+		return nil
+	}
+
+	fc := h.FinalityCertificate
+
+	// Verify finality certificate
+	if filec.lastFinalizedEpoch >= fc.GraniteDecision.Epoch {
+		return xerrors.Errorf("last finalized epoch %d >= proposed finalized epoch %d", filec.lastFinalizedEpoch, fc.GraniteDecision.Epoch)
+	}
+	if filec.lastGraniteInstanceNumber >= fc.GraniteDecision.InstanceNumber {
+		return xerrors.Errorf("last granite instance %d >= proposed granite instance %d", filec.lastGraniteInstanceNumber, fc.GraniteDecision.InstanceNumber)
+	}
+
+	return nil
 }
 
 func (filec *FilecoinEC) minerIsValid(ctx context.Context, maddr address.Address, baseTs *types.TipSet) error {

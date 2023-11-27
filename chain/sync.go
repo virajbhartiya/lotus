@@ -345,6 +345,7 @@ func (syncer *Syncer) InformNewBlock(from peer.ID, blk *types.FullBlock) bool {
 	// TODO: search for other blocks that could form a tipset with this block
 	// and then send that tipset to InformNewHead
 
+	// jiejie: 其实只是使用一个FullBlock创建了一个FullTipSet
 	fts := &store.FullTipSet{Blocks: []*types.FullBlock{blk}}
 	return syncer.InformNewHead(from, fts)
 }
@@ -949,6 +950,10 @@ func (syncer *Syncer) syncMessagesAndCheckState(ctx context.Context, headers []*
 			log.Errorf("failed to validate tipset: %+v", err)
 			return xerrors.Errorf("message processing failed: %w", err)
 		}
+
+		// jiejie: 这里应该validate finality info吗？
+		// jiejie: 我觉得起码可以先在这里写吧，因为我希望先做完EC标准的ValidateBlock，然后再去看里面的finality info
+		//syncer.consensus.Va
 
 		stats.Record(ctx, metrics.ChainNodeWorkerHeight.M(int64(fts.TipSet().Height())))
 		ss.SetHeight(fts.TipSet().Height())

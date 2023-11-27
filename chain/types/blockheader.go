@@ -59,6 +59,7 @@ type BlockHeader struct {
 	BlockSig              *crypto.Signature // 13 unique per block/miner: miner signature
 	ForkSignaling         uint64            // 14 currently unused/undefined
 	ParentBaseFee         abi.TokenAmount   // 15 identical for all blocks in same tipset: the base fee after executing parent tipset
+	FinalityCertificate   *FinalityCertificate
 
 	validated bool // internal, true if the signature has been validated
 }
