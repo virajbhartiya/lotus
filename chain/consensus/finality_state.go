@@ -14,16 +14,11 @@ type FinalityState struct {
 
 func (fs *FinalityState) ValidateFinalityCertificate(fc *types.FinalityCertificate) error {
 	if fc == nil {
-		// TODO(jie): 换成log.Info()?
 		fmt.Println("Empty FinalityCertificate. Skip.")
 		return nil
 	}
 
 	// TODO(jie): Validate voter's identity and total power
-	//   我这里还没有写的原因是Aayush还没有sign off on FinalityState的数据结构是不是一定长成
-	//   那个样子。如果是的话，这里写的validation才有意义。否则如果对于比如说powertable的包含有不同想法，
-	//   那么我这里的verification写了也白写
-
 	// TODO(jie): Validate blssignature
 
 	if fs.lastFinalizedEpoch >= fc.GraniteDecision.Epoch {

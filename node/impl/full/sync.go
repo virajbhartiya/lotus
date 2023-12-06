@@ -109,7 +109,6 @@ func (a *SyncAPI) SyncSubmitBlock(ctx context.Context, blk *types.BlockMsg) erro
 		return xerrors.Errorf("serializing block for pubsub publishing failed: %w", err)
 	}
 
-	// jiejie: 向 /file/blocks 这个GossipSub pubsub topic发送block
 	return a.PubSub.Publish(build.BlocksTopic(a.NetName), b) //nolint:staticcheck
 }
 
@@ -168,7 +167,6 @@ func (a *SyncAPI) SyncSubmitFinalityCertificate(ctx context.Context, blk *types.
 	//	return xerrors.Errorf("serializing block for pubsub publishing failed: %w", err)
 	//}
 
-	// jiejie: 向 /file/blocks 这个GossipSub pubsub topic发送block
 	//return a.PubSub.Publish(build.BlocksTopic(a.NetName), b) //nolint:staticcheck
 
 	//gc := types.GraniteDecision{
@@ -189,7 +187,7 @@ func (a *SyncAPI) SyncSubmitFinalityCertificate(ctx context.Context, blk *types.
 
 	// TODO(jie): Serialize the actual FinalityCertificate object instead of using dummy []byte
 
-	data := []byte("侯杰.蒋雨薇.没有后来的后来 @ " + strconv.FormatInt(time.Now().UTC().UnixMilli(), 10))
+	data := []byte("dummy data " + strconv.FormatInt(time.Now().UTC().UnixMilli(), 10))
 	return a.PubSub.Publish(build.FinalityCertificateTopic(a.NetName), data)
 }
 

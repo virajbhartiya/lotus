@@ -52,7 +52,6 @@ func HandleIncomingBlocks(ctx context.Context, bsub *pubsub.Subscription, s *cha
 	log.Info("jiejie: Start HandleIncomingBlocks() in another goroutine")
 
 	for {
-		// jiejie: 这步调用Next()是真的从topic上读数据([]byte)来着
 		msg, err := bsub.Next(ctx)
 		log.Info("jiejie: Received a incoming block data from topic")
 		if err != nil {
@@ -64,7 +63,6 @@ func HandleIncomingBlocks(ctx context.Context, bsub *pubsub.Subscription, s *cha
 			continue
 		}
 
-		// jiejie: []byte变成BlockMsg类型
 		blk, ok := msg.ValidatorData.(*types.BlockMsg)
 		if !ok {
 			log.Warnf("pubsub block validator passed on wrong type: %#v", msg.ValidatorData)
@@ -127,7 +125,6 @@ func HandleIncomingFinalityCertificate(ctx context.Context, bsub *pubsub.Subscri
 	log.Info("jiejie: Inside sub.HandleIncomingFinalityCertificate()")
 
 	for {
-		// jiejie: 这步调用Next()是真的从topic上读数据([]byte)来着
 		msg, err := bsub.Next(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
@@ -142,7 +139,6 @@ func HandleIncomingFinalityCertificate(ctx context.Context, bsub *pubsub.Subscri
 		received := string(msg.Message.GetData())
 		fmt.Printf("jiejie: Received FinalityCertificate from pubsub: %s\n", received)
 
-		// TODO(jie): msg应该变成FinalityCertificate类型
 		//blk, ok := msg.ValidatorData.(*types.BlockMsg)
 		//if !ok {
 		//	log.Warnf("pubsub block validator passed on wrong type: %#v", msg.ValidatorData)
@@ -151,15 +147,11 @@ func HandleIncomingFinalityCertificate(ctx context.Context, bsub *pubsub.Subscri
 
 		//src := msg.GetFrom()
 
-		// TODO(jie): 这里应该用上真正的FinalityCertificate object，而不是nil
-		// 需要我实现完FinalityCertificate的Deserialize()再说了
 		if err := s.ProcessFinalityCertificate(nil); err != nil {
 			log.Errorf("failed to process finality certificate")
 			return
 		}
 
-		// TODO(jie): 考虑一下，有必要使用go func的形式来异步执行吗？如果执行的过程较慢，比如依赖新的网络请求，
-		// 那么就可以用一个goroutine来执行
 		//go func() {
 		//	ctx, cancel := context.WithTimeout(ctx, timeout)
 		//	defer cancel()
