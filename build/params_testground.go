@@ -25,7 +25,6 @@ var (
 	UnixfsLinksPerLevel = 1024
 
 	BlocksPerEpoch        = uint64(builtin2.ExpectedLeadersPerEpoch)
-	BlockMessageLimit     = 512
 	BlockGasLimit         = int64(100_000_000_000)
 	BlockGasTarget        = int64(BlockGasLimit / 2)
 	BaseFeeMaxChangeDenom = int64(8) // 12.5%
@@ -132,6 +131,8 @@ var (
 	BootstrappersFile = ""
 	GenesisFile       = ""
 )
+
+const BlockMessageLimit = 512
 
 const Finality = policy.ChainFinality
 const ForkLengthThreshold = Finality
