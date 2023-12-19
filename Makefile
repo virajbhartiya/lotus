@@ -182,12 +182,6 @@ lotus-fountain:
 .PHONY: lotus-fountain
 BINS+=lotus-fountain
 
-lotus-bench:
-	rm -f lotus-bench
-	$(GOCC) build $(GOFLAGS) -o lotus-bench ./cmd/lotus-bench
-.PHONY: lotus-bench
-BINS+=lotus-bench
-
 lotus-stats:
 	rm -f lotus-stats
 	$(GOCC) build $(GOFLAGS) -o lotus-stats ./cmd/lotus-stats
