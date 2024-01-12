@@ -96,10 +96,6 @@ type ProviderSubsystemsConfig struct {
 	EnableWinningPost   bool
 	WinningPostMaxTasks int
 
-	EnableWebGui bool
-	// The address that should listen for Web GUI requests.
-	GuiAddress string
-
 	// EnableSealSDR enables SDR tasks to run. SDR is the long sequential computation
 	// creating layers.
 	// In lotus-miner this was run as part of PreCommit1.
@@ -125,6 +121,10 @@ type ProviderSubsystemsConfig struct {
 	// EnableSendCommitMsg enables the sending of commit messages to the chain
 	// from this lotus-provider instance.
 	EnableSendCommitMsg bool
+
+	EnableWebGui bool
+	// The address that should listen for Web GUI requests.
+	GuiAddress string
 }
 
 type DAGStoreConfig struct {
