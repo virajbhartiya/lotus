@@ -8,7 +8,7 @@ import (
 	dchain "github.com/drand/drand/chain"
 	dclient "github.com/drand/drand/client"
 	hclient "github.com/drand/drand/client/http"
-	"github.com/drand/drand/common/scheme"
+	dcrypto "github.com/drand/drand/crypto"
 	dlog "github.com/drand/drand/log"
 	gclient "github.com/drand/drand/lp2p/client"
 	"github.com/drand/kyber"
@@ -47,6 +47,7 @@ type DrandBeacon struct {
 	drandGenTime uint64
 	filGenTime   uint64
 	filRoundTime uint64
+	scheme       *dcrypto.Scheme
 
 	localCache *lru.Cache[uint64, *types.BeaconEntry]
 }
@@ -66,6 +67,10 @@ func (l *logger) With(args ...interface{}) dlog.Logger {
 
 func (l *logger) Named(s string) dlog.Logger {
 	return &logger{l.SugaredLogger.Named(s)}
+}
+
+func (l *logger) AddCallerSkip(skip int) dlog.Logger {
+	return &logger{l.SugaredLogger.With(zap.AddCallerSkip(skip))}
 }
 
 func NewDrandBeacon(genesisTs, interval uint64, ps *pubsub.PubSub, config dtypes.DrandConfig) (*DrandBeacon, error) {
@@ -116,6 +121,11 @@ func NewDrandBeacon(genesisTs, interval uint64, ps *pubsub.PubSub, config dtypes
 		localCache: lc,
 	}
 
+	sch, err := dcrypto.GetSchemeByIDWithDefault(drandChain.Scheme)
+	if err != nil {
+		return nil, err
+	}
+	db.scheme = sch
 	db.pubkey = drandChain.PublicKey
 	db.interval = drandChain.Period
 	db.drandGenTime = uint64(drandChain.GenesisTime)
@@ -170,10 +180,6 @@ func (db *DrandBeacon) VerifyEntry(curr types.BeaconEntry, prev types.BeaconEntr
 		return nil
 	}
 
-	if curr.Round != prev.Round+1 {
-		return xerrors.Errorf("invalid beacon entry: cur (%d) != prev (%d) + 1", curr.Round, prev.Round)
-	}
-
 	if be := db.getCachedValue(curr.Round); be != nil {
 		if !bytes.Equal(curr.Data, be.Data) {
 			return xerrors.New("invalid beacon value, does not match cached good value")
@@ -186,11 +192,15 @@ func (db *DrandBeacon) VerifyEntry(curr types.BeaconEntry, prev types.BeaconEntr
 		Round:       curr.Round,
 		Signature:   curr.Data,
 	}
-	err := dchain.NewVerifier(scheme.GetSchemeFromEnv()).VerifyBeacon(*b, db.pubkey)
-	if err == nil {
-		db.cacheValue(curr)
+
+	err := db.scheme.VerifyBeacon(b, db.pubkey)
+	if err != nil {
+		return xerrors.Errorf("failed to verify beacon: %w", err)
 	}
-	return err
+
+	db.cacheValue(curr)
+
+	return nil
 }
 
 func (db *DrandBeacon) MaxBeaconRoundForEpoch(nv network.Version, filEpoch abi.ChainEpoch) uint64 {

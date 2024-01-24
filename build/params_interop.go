@@ -64,7 +64,8 @@ const UpgradeWatermelonFixHeight = -1
 const UpgradeWatermelonFix2Height = -2
 
 var DrandSchedule = map[abi.ChainEpoch]DrandEnum{
-	0: DrandMainnet,
+	0:                           DrandMainnet,
+	UpgradePineappleHeight + 10: DrandQuicknet,
 }
 
 var SupportedProofTypes = []abi.RegisteredSealProof{

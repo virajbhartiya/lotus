@@ -49,7 +49,9 @@ type RandomBeacon interface {
 
 func ValidateBlockValues(bSchedule Schedule, nv network.Version, h *types.BlockHeader, parentEpoch abi.ChainEpoch,
 	prevEntry types.BeaconEntry) error {
-	{
+
+	// Before nv22 we had "chained" beacons, and so required two entries at a fork
+	if nv < network.Version22 {
 		parentBeacon := bSchedule.BeaconForEpoch(parentEpoch)
 		currBeacon := bSchedule.BeaconForEpoch(h.Height)
 		if parentBeacon != currBeacon {
@@ -65,9 +67,9 @@ func ValidateBlockValues(bSchedule Schedule, nv network.Version, h *types.BlockH
 		}
 	}
 
-	// TODO: fork logic
 	b := bSchedule.BeaconForEpoch(h.Height)
 	maxRound := b.MaxBeaconRoundForEpoch(nv, h.Height)
+	// We don't expect to ever actually meet this condition
 	if maxRound == prevEntry.Round {
 		if len(h.BeaconEntries) != 0 {
 			return xerrors.Errorf("expected not to have any beacon entries in this block, got %d", len(h.BeaconEntries))
@@ -77,6 +79,19 @@ func ValidateBlockValues(bSchedule Schedule, nv network.Version, h *types.BlockH
 
 	if len(h.BeaconEntries) == 0 {
 		return xerrors.Errorf("expected to have beacon entries in this block, but didn't find any")
+	}
+
+	if nv < network.Version22 && prevEntry.Round == 0 {
+		// This basically means that the drand entry of the first non-genesis tipset isn't verified IF we are starting on Drand mainnet (the "chained" drand)
+		// Networks that start on drand quicknet, or other unchained randomness sources, will still verify it
+		return nil
+	}
+
+	for i, e := range h.BeaconEntries {
+		correctRound := b.MaxBeaconRoundForEpoch(nv, parentEpoch+abi.ChainEpoch(i)+1)
+		if e.Round != correctRound {
+			return xerrors.Errorf("unexpected beacon round %d, expected %d for epoch %d", e.Round, correctRound, parentEpoch+abi.ChainEpoch(i))
+		}
 	}
 
 	last := h.BeaconEntries[len(h.BeaconEntries)-1]
@@ -95,7 +110,9 @@ func ValidateBlockValues(bSchedule Schedule, nv network.Version, h *types.BlockH
 }
 
 func BeaconEntriesForBlock(ctx context.Context, bSchedule Schedule, nv network.Version, epoch abi.ChainEpoch, parentEpoch abi.ChainEpoch, prev types.BeaconEntry) ([]types.BeaconEntry, error) {
-	{
+
+	// Before nv22 we had "chained" beacons, and so required two entries at a fork
+	if nv < network.Version22 {
 		parentBeacon := bSchedule.BeaconForEpoch(parentEpoch)
 		currBeacon := bSchedule.BeaconForEpoch(epoch)
 		if parentBeacon != currBeacon {
@@ -123,6 +140,7 @@ func BeaconEntriesForBlock(ctx context.Context, bSchedule Schedule, nv network.V
 	start := build.Clock.Now()
 
 	maxRound := beacon.MaxBeaconRoundForEpoch(nv, epoch)
+	// We don't expect this to ever be the case
 	if maxRound == prev.Round {
 		return nil, nil
 	}
@@ -132,10 +150,11 @@ func BeaconEntriesForBlock(ctx context.Context, bSchedule Schedule, nv network.V
 		prev.Round = maxRound - 1
 	}
 
-	cur := maxRound
+	currEpoch := epoch
 	var out []types.BeaconEntry
-	for cur > prev.Round {
-		rch := beacon.Entry(ctx, cur)
+	for currEpoch > parentEpoch {
+		currRound := beacon.MaxBeaconRoundForEpoch(nv, currEpoch)
+		rch := beacon.Entry(ctx, currRound)
 		select {
 		case resp := <-rch:
 			if resp.Err != nil {
@@ -143,7 +162,7 @@ func BeaconEntriesForBlock(ctx context.Context, bSchedule Schedule, nv network.V
 			}
 
 			out = append(out, resp.Entry)
-			cur = resp.Entry.Round - 1
+			currEpoch = currEpoch - 1
 		case <-ctx.Done():
 			return nil, xerrors.Errorf("context timed out waiting on beacon entry to come back for epoch %d: %w", epoch, ctx.Err())
 		}

@@ -115,7 +115,8 @@ var (
 	UpgradePineappleHeight      abi.ChainEpoch = -26
 
 	DrandSchedule = map[abi.ChainEpoch]DrandEnum{
-		0: DrandMainnet,
+		0:                           DrandMainnet,
+		UpgradePineappleHeight + 10: DrandQuicknet,
 	}
 
 	GenesisNetworkVersion = network.Version0

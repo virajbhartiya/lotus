@@ -16,8 +16,9 @@ import (
 )
 
 var DrandSchedule = map[abi.ChainEpoch]DrandEnum{
-	0:                  DrandIncentinet,
-	UpgradeSmokeHeight: DrandMainnet,
+	0:                           DrandIncentinet,
+	UpgradeSmokeHeight:          DrandMainnet,
+	UpgradePineappleHeight + 10: DrandQuicknet,
 }
 
 var NetworkBundle = "mainnet"
