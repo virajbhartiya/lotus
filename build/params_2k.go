@@ -67,9 +67,9 @@ var UpgradeThunderHeight = abi.ChainEpoch(-23)
 
 var UpgradeWatermelonHeight = abi.ChainEpoch(-24)
 
-var UpgradePineappleHeight = abi.ChainEpoch(20)
+var UpgradePineappleHeight = abi.ChainEpoch(200)
 
-var UpgradeMangoHeight = UpgradePineappleHeight + 10
+var UpgradeMangoHeight = UpgradePineappleHeight + 100
 
 // This fix upgrade only ran on calibrationnet
 const UpgradeWatermelonFixHeight = -100
