@@ -57,7 +57,7 @@ const UpgradeLightningHeight = -22
 const UpgradeThunderHeight = -23
 const UpgradeWatermelonHeight = -24
 
-const UpgradeDragonHeight = 5760
+const UpgradeDragonHeight = 480
 
 const UpgradePhoenixHeight = UpgradeDragonHeight + 120
 
