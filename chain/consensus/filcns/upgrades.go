@@ -8,6 +8,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/docker/go-units"
@@ -301,7 +302,7 @@ func DefaultUpgradeSchedule() stmgr.UpgradeSchedule {
 	}, {
 		Height:    build.UpgradeCalibrationDragonFixHeight,
 		Network:   network.Version22,
-		Migration: upgradeActorsV13VerifregFix(calibnetv13BuggyVerifregCID1, calibnetv13CorrectManifestCID1),
+		Migration: upgradeActorsV13VerifregFix(devnetv13BuggyVerifregCID1, devnetv13CorrectManifestCID1),
 	},
 	}
 
@@ -1915,6 +1916,14 @@ var (
 
 	calibnetv13BuggyManifestCID1   = cid.MustParse("bafy2bzacea4firkyvt2zzdwqjrws5pyeluaesh6uaid246tommayr4337xpmi")
 	calibnetv13CorrectManifestCID1 = cid.MustParse("bafy2bzacect4ktyujrwp6mjlsitnpvuw2pbuppz6w52sfljyo4agjevzm75qs")
+
+	devnetv13BuggyVerifregCID1 = cid.MustParse("bafk2bzacebjwc4fp4n556agi5i4pccuzn4bhn2tl24l4cskgvmwgadycff3oo")
+
+	devnetv13BuggyBundleSuffix1 = "devnet-13-rc3"
+
+	devnetv13BuggyManifestCID1 = cid.MustParse("bafy2bzaceap34qfq4emg4fp3xd7bxtzt7pvkaj37kunqm2ccvttchtlljw7d4")
+
+	devnetv13CorrectManifestCID1 = cid.MustParse("bafy2bzacecn7uxgehrqbcs462ktl2h23u23cmduy2etqj6xrd6tkkja56fna4")
 )
 
 func upgradeActorsV12Common(
@@ -2259,8 +2268,9 @@ func upgradeActorsV13Common(
 	}
 
 	var manifestCid cid.Cid
-	if initState.NetworkName == "calibrationnet" {
-		embedded, ok := build.GetEmbeddedBuiltinActorsBundle(actorstypes.Version13, calibnetv13BuggyBundleSuffix1)
+	if initState.NetworkName == "calibrationnet" || strings.HasPrefix(initState.NetworkName, "localnet") {
+		fmt.Println("running the janky migration")
+		embedded, ok := build.GetEmbeddedBuiltinActorsBundle(actorstypes.Version13, devnetv13BuggyBundleSuffix1)
 		if !ok {
 			return cid.Undef, xerrors.Errorf("didn't find buggy calibrationnet bundle")
 		}
@@ -2271,8 +2281,8 @@ func upgradeActorsV13Common(
 			return cid.Undef, xerrors.Errorf("failed to load buggy calibnet bundle: %w", err)
 		}
 
-		if manifestCid != calibnetv13BuggyManifestCID1 {
-			return cid.Undef, xerrors.Errorf("didn't find expected buggy calibnet bundle manifest: %s != %s", manifestCid, calibnetv12BuggyManifestCID1)
+		if manifestCid != devnetv13BuggyManifestCID1 {
+			return cid.Undef, xerrors.Errorf("why didn't i find expected buggy calibnet bundle manifest: %s != %s", manifestCid, devnetv13BuggyManifestCID1)
 		}
 	} else {
 		ok := false
@@ -2325,7 +2335,7 @@ func upgradeActorsV13VerifregFix(oldBuggyVerifregCID, newManifestCID cid.Cid) fu
 		}
 
 		// this loads the buggy bundle, for UpgradeDragonHeight
-		embedded, ok := build.GetEmbeddedBuiltinActorsBundle(actorstypes.Version13, calibnetv13BuggyBundleSuffix1)
+		embedded, ok := build.GetEmbeddedBuiltinActorsBundle(actorstypes.Version13, devnetv13BuggyBundleSuffix1)
 		if !ok {
 			return cid.Undef, xerrors.Errorf("didn't find buggy calibrationnet bundle")
 		}
@@ -2398,6 +2408,10 @@ func upgradeActorsV13VerifregFix(oldBuggyVerifregCID, newManifestCID cid.Cid) fu
 			newCid, ok := codeMapping[actor.Code]
 			if !ok {
 				return xerrors.Errorf("didn't find mapping for %s", actor.Code)
+			}
+
+			if newCid != actor.Code {
+				fmt.Println("migrating ", actor.Code, " to ", newCid)
 			}
 
 			return actorsOut.SetActor(a, &types.ActorV5{
