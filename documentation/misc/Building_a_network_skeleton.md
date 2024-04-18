@@ -17,8 +17,7 @@ Each repository has its own set of steps that need to be followed. This guide wi
 
 3. Clone the [go-state-types](https://github.com/filecoin-project/go-state-types) repository.
 
-4. In your Lotus repository, add `replace github.com/filecoin-project/go-state-types => ../go-state-types` to the very end of your Lotus `go.mod` file.
-    - This ensures that your local clone copy of `go-state-types` is used. Any changes you make there will be reflected in your Lotus project.
+4. Clone the [lotus](https://github.com/filecoin-project/lotus) repository.
 
 ## Ref-FVM Checklist
 
@@ -27,16 +26,18 @@ Each repository has its own set of steps that need to be followed. This guide wi
     - In `fvm/Cargo.toml` add `nvXX-dev` as a feature flag in the [features]-section.
     - In `fvm/src/gas/price_list.rs`, extend the `price_list_by_network_version` function to support the new network version with the `nvXX-dev` feature flag.
     - In fvm/src/machine/default.rs, locate the new function within your machine context. You'll find a SUPPORTED_VERSIONS constant that sets the range of supported network versions. Update this range to include the new network version. Do this by replacing the existing feature flag nvXX-dev and NetworkVersion::VXX with the new ones corresponding to your new network version.
-    - In `shared/src/version/mod.rs`, in the `NetworkVersion` implementation, you will find a series of constants representing different network versions. To add a new network version, you need to declare a new constant: `pub const (VXX+1): Self = Self(XX+1);` 
+    - In `shared/src/version/mod.rs`, in the `NetworkVersion` implementation, you will find a series of constants representing different network versions. To add a new network version, you need to declare a new constant: `pub const (VXX+1): Self = Self(XX+1);`
 
-You can take a look at [this Ref-FVM PR as a reference](https://github.com/filecoin-project/ref-fvm/pull/1929), which added the skeleton for network version 22.
+Open the PR against the master branch in the Ref-FVM repository.
+
+You can take a look at **[this Ref-FVM PR as a reference](https://github.com/filecoin-project/ref-fvm/pull/1929)**, which added the skeleton for network version 22.
 
 ## Filecoin-FFI Checklist
 
 1. Update the `TryFrom<u32>` implementation for `EngineVersion` in `rust/src/fvm/engine.rs`
     - Add the new network version number (XX+1) to the existing match arm for the network version.
 
-2. Patch the FVM-dependency (fvm3) in `rust/cargo.toml` to use the custom branch of the FVM created in the [Ref-FVM Checklist](#ref-fvm-checklist))
+2. Patch the FVM-dependency (fvm4) in `rust/cargo.toml` to use the custom branch of the FVM created in the [Ref-FVM Checklist](#ref-fvm-checklist))
     -  Add `features = ["your-ref-fvm-branch"]` to tell Cargo to use you Ref-FVM branch.
 
 You can take a look at this [Filecoin-FFI PR as a reference](https://github.com/filecoin-project/filecoin-ffi/pull/438), which added the skeleton for network version 22.
@@ -45,8 +46,8 @@ You can take a look at this [Filecoin-FFI PR as a reference](https://github.com/
 
 1. Follow the [go-state-types actor version checklist](https://github.com/filecoin-project/go-state-types/blob/master/actors_version_checklist.md):
 
-    - Copy `go-state-types/builtin/vX` to `go-state-types/builtin/v(X+1)`.
-    - Change all references from vX to v(X+1) in the new files.
+    - Copy `go-state-types/builtin/vXX` to `go-state-types/builtin/v(XX+1)`.
+    - Change all references from vXX to v(XX+1) in the new files.
     - Add new network version to `network/version.go`.
     - Add new actors version to `actors/version.go`.
         - Add `Version(XX+1) Version = XX+1` as a constant.
@@ -54,16 +55,31 @@ You can take a look at this [Filecoin-FFI PR as a reference](https://github.com/
     - Add the new version to the gen step of the makefile.
         - Add `$(GO_BIN) run ./builtin/v(XX+1)/gen/gen.go`.
 
-You can take a look at this [Go-State-Types PR as a reference](https://github.com/filecoin-project/go-state-types/pull/232), which added the skeleton for network version 22.
+Create a `Create base nv(XX+1) skeleton` commit for these changes so its easier to review.
+
+2. Delete the migration files specific to the previous network version in you `go-state-types/builtin/v(X+1)` folder:
+
+    - Delete the files in `go-state-types/builtin/(vXX+1)/migration/xxxxx.go`
+
+Create a `Delete migration specific for nv(XX)` commit for these changes so its easier to review.
+
+3. Open the PR against the master branch in the Go-State-Types repository.
+
+You can take a look at this **[Go-State-Types PR as a reference](https://github.com/filecoin-project/go-state-types/pull/232)**, which added the skeleton for network version 22.
+
+4. In a followup PR add a 
     
 ## Lotus Checklist
 
-1. Import new actors:
+1. In your Lotus repository, add `replace github.com/filecoin-project/go-state-types => ../go-state-types` to the very end of your Lotus `go.mod` file.
+    - This ensures that your local clone copy of `go-state-types` is used. Any changes you make there will be reflected in your Lotus project.
+
+2. Import new actors:
 
     - Create a mock actor-bundle for the new network version.
     - In `/build/actors` run `./pack.sh vXX+1 vXX.0.0` where XX is the current actor bundle version.
 
-2. Define upgrade heights in `build/params_`:
+3. Define upgrade heights in `build/params_`:
 
     - Update the following files:
         - `params_2k.go`
@@ -89,7 +105,7 @@ You can take a look at this [Go-State-Types PR as a reference](https://github.co
         - `params_testground.go`
             - Add `UpgradeXxxxxHeight     abi.ChainEpoch = (-xx-1)`
 
-3. Generate adapters:
+4. Generate adapters:
 
     - Update `gen/inlinegen-data.json`.
         - Add `XX+1` to "actorVersions" and set "latestActorsVersion" to `XX+1`.
@@ -97,26 +113,26 @@ You can take a look at this [Go-State-Types PR as a reference](https://github.co
 
     - Run `make actors-gen`. This generates the `/chain/actors/builtin/*` code, `/chain/actors/policy/policy.go` code, `/chain/actors/version.go`, and `/itest/kit/ensemble_opts_nv.go`.
 
-4. Update `chain/consensus/filcns/upgrades.go`.
+5. Update `chain/consensus/filcns/upgrades.go`.
     - Import `nv(XX+1) "github.com/filecoin-project/go-state-types/builtin/v(XX+1)/migration`.
     - Add Schedule. [^1]
     - Add Migration. [^2]
 
-5. Add actorstype to the NewActorRegistry in `/chain/consensus/computestate.go`.
+6. Add actorstype to the NewActorRegistry in `/chain/consensus/computestate.go`.
     - Add `inv.Register(actorstypes.Version(XX+1), vm.ActorsVersionPredicate(actorstypes.Version(XX+1)), builtin.MakeRegistry(actorstypes.Version(XX+1))`.
 
-6. Add upgrade field to `api/types.go/ForkUpgradeParams`.
+7. Add upgrade field to `api/types.go/ForkUpgradeParams`.
     - Add `UpgradeXxxxxHeight      abi.ChainEpoch` to `ForkUpgradeParams` struct.
 
-7. Add upgrade to `node/impl/full/state.go`.
+8. Add upgrade to `node/impl/full/state.go`.
     - Add `UpgradeXxxxxHeight:      build.UpgradeXxxxxHeight,`.
 
-8. Add network version to `chain/state/statetree.go`.
+9. Add network version to `chain/state/statetree.go`.
     - Add `network.VersionXX+1` to `VersionForNetwork` function.
 
-9. Run `make gen`.
+10. Run `make gen`.
 
-10. Run `make docsgen-cli`.
+11. Run `make docsgen-cli`.
 
 And you're done! This should create a network upgrade skeleton that you are able to run locally with your local go-state-types clones, and a mock Actors-bundle. This will allow you to:
 
@@ -127,7 +143,7 @@ And you're done! This should create a network upgrade skeleton that you are able
 
 You can take a look at this [Lotus PR as a reference](https://github.com/filecoin-project/lotus/pull/11432), which added the skeleton for network version 22.
 
-// TODO: Create a video-tutorial going through all the steps
+// TODO: Create the steps for running the network skeleton in a local devnet.
 
 [^1]: Here is an example of how you can add a schedule:
 
@@ -189,7 +205,7 @@ You can take a look at this [Lotus PR as a reference](https://github.com/filecoi
         }
         newRoot, err := upgradeActorsV(XX+1)Common(ctx, sm, cache, root, epoch, ts, config)
         if err != nil {
-            return cid.Undef, xerrors.Errorf("migrating actors v11 state: %w", err)
+            return cid.Undef, xerrors.Errorf("migrating actors (vXX+1) state: %w", err)
         }
         return newRoot, nil
     }
@@ -228,7 +244,7 @@ You can take a look at this [Lotus PR as a reference](https://github.com/filecoi
         newHamtRoot, err := nv(XX+1).MigrateStateTree(ctx, adtStore, manifest, stateRoot.Actors, epoch, config,
             migrationLogger{}, cache)
         if err != nil {
-            return cid.Undef, xerrors.Errorf("upgrading to actors v11: %w", err)
+            return cid.Undef, xerrors.Errorf("upgrading to actors (vXX+1): %w", err)
         }
 
         // Persist the result.
