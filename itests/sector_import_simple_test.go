@@ -332,7 +332,7 @@ func remoteGetSector(sectorRoot string) func(w http.ResponseWriter, r *http.Requ
 			w.Header().Set("Content-Type", "application/x-tar")
 			w.WriteHeader(200)
 
-			err := tarutil.TarDirectory(path, w, make([]byte, 1<<20))
+			err := tarutil.TarDirectory(tarutil.CacheFileConstraints, path, w, make([]byte, 1<<20))
 			if err != nil {
 				return
 			}

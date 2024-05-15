@@ -53,7 +53,7 @@ func fetch(ctx context.Context, url, outname string, header http.Header) (rerr e
 
 	switch mediatype {
 	case "application/x-tar":
-		bytes, err = tarutil.ExtractTar(resp.Body, outname, make([]byte, CopyBuf))
+		bytes, err = tarutil.ExtractTar(tarutil.CacheFileConstraints, resp.Body, outname, make([]byte, CopyBuf))
 		return err
 	case "application/octet-stream":
 		f, err := os.Create(outname)

@@ -70,7 +70,32 @@ var CacheFileConstraints = map[string]int64{
 	"sc-02-data-tree-d.dat": 130 << 30, // 2x sector size, ~130G accunting for small buffer on 64G sectors
 }
 
-func ExtractTar(body io.Reader, dir string, buf []byte) (int64, error) {
+var FinCacheFileConstraints = map[string]int64{
+	"p_aux": 64,
+	"t_aux": 10240,
+
+	"sc-02-data-tree-r-last.dat": 10_000_000, // small sectors
+
+	"sc-02-data-tree-r-last-0.dat": 10_000_000,
+	"sc-02-data-tree-r-last-1.dat": 10_000_000,
+	"sc-02-data-tree-r-last-2.dat": 10_000_000,
+	"sc-02-data-tree-r-last-3.dat": 10_000_000,
+	"sc-02-data-tree-r-last-4.dat": 10_000_000,
+	"sc-02-data-tree-r-last-5.dat": 10_000_000,
+	"sc-02-data-tree-r-last-6.dat": 10_000_000,
+	"sc-02-data-tree-r-last-7.dat": 10_000_000,
+
+	"sc-02-data-tree-r-last-8.dat":  10_000_000,
+	"sc-02-data-tree-r-last-9.dat":  10_000_000,
+	"sc-02-data-tree-r-last-10.dat": 10_000_000,
+	"sc-02-data-tree-r-last-11.dat": 10_000_000,
+	"sc-02-data-tree-r-last-12.dat": 10_000_000,
+	"sc-02-data-tree-r-last-13.dat": 10_000_000,
+	"sc-02-data-tree-r-last-14.dat": 10_000_000,
+	"sc-02-data-tree-r-last-15.dat": 10_000_000,
+}
+
+func ExtractTar(constraints map[string]int64, body io.Reader, dir string, buf []byte) (int64, error) {
 	if err := os.MkdirAll(dir, 0755); err != nil { // nolint
 		return 0, xerrors.Errorf("mkdir: %w", err)
 	}
@@ -88,7 +113,7 @@ func ExtractTar(body io.Reader, dir string, buf []byte) (int64, error) {
 		case nil:
 		}
 
-		sz, found := CacheFileConstraints[header.Name]
+		sz, found := constraints[header.Name]
 		if !found {
 			return read, xerrors.Errorf("tar file %#v isn't expected", header.Name)
 		}
@@ -121,7 +146,7 @@ func ExtractTar(body io.Reader, dir string, buf []byte) (int64, error) {
 	}
 }
 
-func TarDirectory(dir string, w io.Writer, buf []byte) error {
+func TarDirectory(constraints map[string]int64, dir string, w io.Writer, buf []byte) error {
 	tw := tar.NewWriter(w)
 
 	files, err := os.ReadDir(dir)
@@ -133,6 +158,15 @@ func TarDirectory(dir string, w io.Writer, buf []byte) error {
 		info, err := file.Info()
 		if err != nil {
 			return xerrors.Errorf("getting file info for file %s: %w", file.Name(), err)
+		}
+
+		if info.IsDir() {
+			log.Errorw("TarDirectory: skipping directory", "dir", file.Name())
+			continue
+		}
+
+		if _, found := constraints[file.Name()]; !found {
+			continue
 		}
 
 		h, err := tar.FileInfoHeader(info, "")

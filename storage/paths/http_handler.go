@@ -144,7 +144,12 @@ func (handler *FetchHandler) remoteGetSector(w http.ResponseWriter, r *http.Requ
 		w.Header().Set("Content-Type", "application/x-tar")
 		w.WriteHeader(200)
 
-		err := tarutil.TarDirectory(path, w, make([]byte, CopyBuf))
+		constraints := tarutil.CacheFileConstraints
+		if _, ok := r.URL.Query()["mincache"]; ok {
+			constraints = tarutil.FinCacheFileConstraints
+		}
+
+		err := tarutil.TarDirectory(constraints, path, w, make([]byte, CopyBuf))
 		if err != nil {
 			log.Errorf("send tar: %+v", err)
 			return
