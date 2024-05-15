@@ -24,7 +24,7 @@ import (
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 )
 
-var isDevnet = build.BlockDelaySecs < 30
+var IsDevnet = build.BlockDelaySecs < 30
 
 type SDRAPI interface {
 	ChainHead(context.Context) (*types.TipSet, error)
@@ -194,7 +194,7 @@ func (s *SDRTask) CanAccept(ids []harmonytask.TaskID, engine *harmonytask.TaskEn
 
 func (s *SDRTask) TypeDetails() harmonytask.TaskTypeDetails {
 	ssize := abi.SectorSize(32 << 30) // todo task details needs taskID to get correct sector size
-	if isDevnet {
+	if IsDevnet {
 		ssize = abi.SectorSize(2 << 20)
 	}
 
@@ -211,7 +211,7 @@ func (s *SDRTask) TypeDetails() harmonytask.TaskTypeDetails {
 		Follows:     nil,
 	}
 
-	if isDevnet {
+	if IsDevnet {
 		res.Cost.Ram = 1 << 30
 	}
 

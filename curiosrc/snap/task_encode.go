@@ -5,6 +5,7 @@ import (
 	"github.com/filecoin-project/go-commp-utils/nonffi"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/curiosrc/ffi"
+	"github.com/filecoin-project/lotus/curiosrc/seal"
 	"github.com/filecoin-project/lotus/lib/harmony/harmonydb"
 	"github.com/filecoin-project/lotus/lib/harmony/harmonytask"
 	"github.com/filecoin-project/lotus/lib/harmony/resources"
@@ -148,11 +149,11 @@ func (e *EncodeTask) CanAccept(ids []harmonytask.TaskID, engine *harmonytask.Tas
 
 func (e *EncodeTask) TypeDetails() harmonytask.TaskTypeDetails {
 	ssize := abi.SectorSize(32 << 30) // todo task details needs taskID to get correct sector size
-	if isDevnet {
+	if seal.IsDevnet {
 		ssize = abi.SectorSize(2 << 20)
 	}
 	gpu := 1.0
-	if isDevnet {
+	if seal.IsDevnet {
 		gpu = 0
 	}
 

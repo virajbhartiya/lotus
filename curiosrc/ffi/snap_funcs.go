@@ -23,9 +23,11 @@ func (sb *SealCalls) EncodeUpdate(
 	}
 	defer releaseSector()
 
-	replicaPath := ""      // TODO can this be a named pipe??
-	replicaCachePath := "" // todo some temp copy??
-	stagedDataPath := ""   // todo can this be a named pipe??
+	//sb.sectors.storage.ReaderSeq()
+
+	replicaPath := ""      // can this be a named pipe - no, mmap in proofs
+	replicaCachePath := "" // some temp copy
+	stagedDataPath := ""   // can this be a named pipe - no, mmap in proofs
 
 	sealed, unsealed, err := ffi.SectorUpdate.EncodeInto(proofType, paths.Update, paths.UpdateCache, replicaPath, replicaCachePath, stagedDataPath, pieces)
 	if err != nil {

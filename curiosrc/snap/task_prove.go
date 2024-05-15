@@ -2,6 +2,7 @@ package snap
 
 import (
 	"github.com/filecoin-project/lotus/curiosrc/ffi"
+	"github.com/filecoin-project/lotus/curiosrc/seal"
 	"github.com/filecoin-project/lotus/lib/harmony/harmonydb"
 	"github.com/filecoin-project/lotus/lib/harmony/harmonytask"
 	"github.com/filecoin-project/lotus/lib/harmony/resources"
@@ -26,7 +27,7 @@ func (p *ProveTask) CanAccept(ids []harmonytask.TaskID, engine *harmonytask.Task
 
 func (p *ProveTask) TypeDetails() harmonytask.TaskTypeDetails {
 	gpu := 1.0
-	if isDevnet {
+	if seal.IsDevnet {
 		gpu = 0
 	}
 	return harmonytask.TaskTypeDetails{

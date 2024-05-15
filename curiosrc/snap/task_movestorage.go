@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/lotus/curiosrc/ffi"
+	"github.com/filecoin-project/lotus/curiosrc/seal"
 	"github.com/filecoin-project/lotus/lib/harmony/harmonydb"
 	"github.com/filecoin-project/lotus/lib/harmony/harmonytask"
 	"github.com/filecoin-project/lotus/lib/harmony/resources"
@@ -20,8 +21,35 @@ type MoveStorageTask struct {
 }
 
 func (m *MoveStorageTask) Do(taskID harmonytask.TaskID, stillOwned func() bool) (done bool, err error) {
-	//TODO implement me
-	panic("implement me")
+	ctx := context.Background()
+
+	var sectorParamsArr []struct {
+		SpID         int64                   `db:"sp_id"`
+		SectorNumber int64                   `db:"sector_number"`
+		RegSealProof abi.RegisteredSealProof `db:"reg_seal_proof"`
+	}
+
+	err = m.db.Select(ctx, &sectorParamsArr, `SELECT snp.sp_id, snp.sector_number, sm.reg_seal_proof
+		FROM sectors_snap_pipeline snp INNER JOIN sectors_meta sm ON snp.sp_id = sm.sp_id AND snp.sector_number = sm.sector_num
+		WHERE snp.task_id_move_storage = $1`, taskID)
+	if err != nil {
+		return false, xerrors.Errorf("getting sector params: %w", err)
+	}
+
+	if len(sectorParamsArr) != 1 {
+		return false, xerrors.Errorf("expected 1 sector, got %d", len(sectorParamsArr))
+	}
+
+	sectorParams := sectorParamsArr[0]
+
+	sector := abi.SectorID{
+		Miner:  abi.ActorID(sectorParams.SpID),
+		Number: abi.SectorNumber(sectorParams.SectorNumber),
+	}
+
+	// todo move storage logic
+
+	return true, nil
 }
 
 func (m *MoveStorageTask) CanAccept(ids []harmonytask.TaskID, engine *harmonytask.TaskEngine) (*harmonytask.TaskID, error) {
@@ -31,7 +59,7 @@ func (m *MoveStorageTask) CanAccept(ids []harmonytask.TaskID, engine *harmonytas
 
 func (m *MoveStorageTask) TypeDetails() harmonytask.TaskTypeDetails {
 	ssize := abi.SectorSize(32 << 30) // todo task details needs taskID to get correct sector size
-	if isDevnet {
+	if seal.IsDevnet {
 		ssize = abi.SectorSize(2 << 20)
 	}
 	return harmonytask.TaskTypeDetails{
