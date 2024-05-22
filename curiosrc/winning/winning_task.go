@@ -6,12 +6,11 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"encoding/json"
-	"sync"
 	"time"
 
-	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-cid"
 	logging "github.com/ipfs/go-log/v2"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/xerrors"
 
 	ffi "github.com/filecoin-project/filecoin-ffi"
@@ -43,9 +42,8 @@ type WinPostTask struct {
 	max int
 	db  *harmonydb.DB
 
-	curioFfiWrap *ffiselect.CurioFFIWrap
-	paths        *paths.Local
-	verifier     storiface.Verifier
+	paths    *paths.Local
+	verifier storiface.Verifier
 
 	api    WinPostAPI
 	actors map[dtypes.MinerAddress]bool
@@ -72,15 +70,14 @@ type WinPostAPI interface {
 	WalletSign(context.Context, address.Address, []byte) (*crypto.Signature, error)
 }
 
-func NewWinPostTask(max int, db *harmonydb.DB, curioFfiWrap *ffiselect.CurioFFIWrap, pl *paths.Local, verifier storiface.Verifier, api WinPostAPI, actors map[dtypes.MinerAddress]bool) *WinPostTask {
+func NewWinPostTask(max int, db *harmonydb.DB, pl *paths.Local, verifier storiface.Verifier, api WinPostAPI, actors map[dtypes.MinerAddress]bool) *WinPostTask {
 	t := &WinPostTask{
-		max:          max,
-		db:           db,
-		curioFfiWrap: curioFfiWrap,
-		paths:        pl,
-		verifier:     verifier,
-		api:          api,
-		actors:       actors,
+		max:      max,
+		db:       db,
+		paths:    pl,
+		verifier: verifier,
+		api:      api,
+		actors:   actors,
 	}
 	// TODO: run warmup
 
@@ -275,7 +272,7 @@ func (t *WinPostTask) Do(taskID harmonytask.TaskID, stillOwned func() bool) (don
 			}
 		}
 
-		t.generateWinningPost(ctx, ppt, abi.ActorID(details.SpID), sectorChallenges, prand)
+		_, err = t.generateWinningPost(ctx, ppt, abi.ActorID(details.SpID), sectorChallenges, prand)
 		//wpostProof, err = t.prover.GenerateWinningPoSt(ctx, ppt, abi.ActorID(details.SpID), sectorChallenges, prand)
 		if err != nil {
 			err = xerrors.Errorf("failed to compute winning post proof: %w", err)
@@ -447,34 +444,29 @@ func (t *WinPostTask) generateWinningPost(
 	// don't throttle winningPoSt
 	// * Always want it done asap
 	// * It's usually just one sector
-	var wg sync.WaitGroup
-	wg.Add(len(sectors))
 
 	vproofs := make([][]byte, len(sectors))
-	var rerr error
+	eg := errgroup.Group{}
 
 	for i, s := range sectors {
-		go func(i int, s storiface.PostSectorChallenge) {
-			defer wg.Done()
-
+		i, s := i, s
+		eg.Go(func() error {
 			vanilla, err := t.paths.GenerateSingleVanillaProof(ctx, mid, s, ppt)
 			if err != nil {
-				rerr = multierror.Append(rerr, xerrors.Errorf("get winning sector:%d,vanila failed: %w", s.SectorNumber, err))
-				return
+				return xerrors.Errorf("get winning sector:%d,vanila failed: %w", s.SectorNumber, err)
 			}
 			if vanilla == nil {
-				rerr = multierror.Append(rerr, xerrors.Errorf("get winning sector:%d,vanila is nil", s.SectorNumber))
+				return xerrors.Errorf("get winning sector:%d,vanila is nil", s.SectorNumber)
 			}
 			vproofs[i] = vanilla
-		}(i, s)
+			return nil
+		})
 	}
-	wg.Wait()
-
-	if rerr != nil {
-		return nil, rerr
+	if err := eg.Wait(); err != nil {
+		return nil, err
 	}
 
-	return t.curioFfiWrap.GenerateWinningPoStWithVanilla(ctx, ppt, mid, randomness, vproofs)
+	return ffiselect.GenerateWinningPoStWithVanilla(ppt, mid, randomness, vproofs)
 
 }
 

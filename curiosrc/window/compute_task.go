@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	logging "github.com/ipfs/go-log/v2"
 	"github.com/samber/lo"
@@ -23,13 +24,13 @@ import (
 	"github.com/filecoin-project/lotus/chain/actors/builtin/miner"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/lotus/curiosrc/chainsched"
-	"github.com/filecoin-project/lotus/lib/ffiselect"
 	"github.com/filecoin-project/lotus/lib/harmony/harmonydb"
 	"github.com/filecoin-project/lotus/lib/harmony/harmonytask"
 	"github.com/filecoin-project/lotus/lib/harmony/resources"
 	"github.com/filecoin-project/lotus/lib/harmony/taskhelp"
 	"github.com/filecoin-project/lotus/lib/promise"
 	"github.com/filecoin-project/lotus/node/modules/dtypes"
+	"github.com/filecoin-project/lotus/storage/paths"
 	"github.com/filecoin-project/lotus/storage/sealer"
 	"github.com/filecoin-project/lotus/storage/sealer/sealtasks"
 	"github.com/filecoin-project/lotus/storage/sealer/storiface"
@@ -66,13 +67,15 @@ type WdPostTask struct {
 	db  *harmonydb.DB
 
 	faultTracker sealer.FaultTracker
-	curioFfiWrap *ffiselect.CurioFFIWrap
+	storage      paths.Store
 	verifier     storiface.Verifier
 
 	windowPoStTF promise.Promise[harmonytask.AddTaskFunc]
 
-	actors map[dtypes.MinerAddress]bool
-	max    int
+	actors               map[dtypes.MinerAddress]bool
+	max                  int
+	parallel             chan struct{}
+	challengeReadTimeout time.Duration
 }
 
 type wdTaskIdentity struct {
@@ -85,22 +88,28 @@ type wdTaskIdentity struct {
 func NewWdPostTask(db *harmonydb.DB,
 	api WDPoStAPI,
 	faultTracker sealer.FaultTracker,
-	curioFFIWrap *ffiselect.CurioFFIWrap,
+	storage paths.Store,
 	verifier storiface.Verifier,
 	pcs *chainsched.CurioChainSched,
 	actors map[dtypes.MinerAddress]bool,
 	max int,
+	parallel int,
+	challengeReadTimeout time.Duration,
 ) (*WdPostTask, error) {
 	t := &WdPostTask{
 		db:  db,
 		api: api,
 
 		faultTracker: faultTracker,
-		curioFfiWrap: curioFFIWrap,
+		storage:      storage,
 		verifier:     verifier,
 
-		actors: actors,
-		max:    max,
+		actors:               actors,
+		max:                  max,
+		challengeReadTimeout: challengeReadTimeout,
+	}
+	if parallel > 0 {
+		t.parallel = make(chan struct{}, parallel)
 	}
 
 	if pcs != nil {

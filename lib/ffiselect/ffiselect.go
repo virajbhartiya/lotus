@@ -2,19 +2,19 @@ package ffiselect
 
 import (
 	"bytes"
-	"context"
 	"encoding/gob"
 	"os"
 	"os/exec"
 	"strconv"
-	"strings"
+
+	"github.com/ipfs/go-cid"
+	"golang.org/x/xerrors"
 
 	ffi "github.com/filecoin-project/filecoin-ffi"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/filecoin-project/go-state-types/proof"
 
 	"github.com/filecoin-project/lotus/curiosrc/build"
-	"github.com/filecoin-project/lotus/storage/sealer/storiface"
 )
 
 var IsCuda = build.IsOpencl != "1"
@@ -44,7 +44,7 @@ type FFICall struct {
 	Args []interface{}
 }
 
-func call(layers []string, fn string, args ...interface{}) ([]interface{}, error) {
+func call(fn string, args ...interface{}) ([]interface{}, error) {
 	// get dOrdinal
 	dOrdinal := <-ch
 	defer func() {
@@ -57,9 +57,6 @@ func call(layers []string, fn string, args ...interface{}) ([]interface{}, error
 	}
 
 	commandAry := []string{"ffi"}
-	if len(layers) > 0 {
-		commandAry = append(commandAry, "--layers="+strings.Join(layers, ","))
-	}
 	cmd := exec.Command(p, commandAry...)
 
 	// Set Visible Devices for CUDA and OpenCL
@@ -70,6 +67,12 @@ func call(layers []string, fn string, args ...interface{}) ([]interface{}, error
 			}
 			return "GPU_DEVICE_ORDINAL=" + dOrdinal
 		}(IsCuda))
+	tmpDir, err := os.MkdirTemp("", "rust-fil-proofs")
+	if err != nil {
+		return nil, err
+	}
+	cmd.Env = append(cmd.Env, "TMPDIR="+tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
@@ -84,7 +87,7 @@ func call(layers []string, fn string, args ...interface{}) ([]interface{}, error
 		Args: args,
 	})
 	if err != nil {
-		return nil, err
+		return nil, xerrors.Errorf("subprocess caller cannot encode: %w", err)
 	}
 	err = cmd.Run()
 	if err != nil {
@@ -93,63 +96,87 @@ func call(layers []string, fn string, args ...interface{}) ([]interface{}, error
 	var ve ValErr
 	err = gob.NewDecoder(outFile).Decode(&ve)
 	if err != nil {
+		return nil, xerrors.Errorf("subprocess caller cannot decode: %w", err)
+	}
+	if ve.Val[len(ve.Val)-1].(error) != nil {
+		return nil, ve.Val[len(ve.Val)-1].(error)
+	}
+	return ve.Val, nil
+}
+
+///////////Funcs reachable by the GPU selector.///////////
+// NOTE: Changes here MUST also change ffi-direct.go
+
+func GenerateSinglePartitionWindowPoStWithVanilla(
+	proofType abi.RegisteredPoStProof,
+	minerID abi.ActorID,
+	randomness abi.PoStRandomness,
+	proofs [][]byte,
+	partitionIndex uint,
+) (*ffi.PartitionProof, error) {
+	val, err := call("GenerateSinglePartitionWindowPoStWithVanilla", proofType, minerID, randomness, proofs, partitionIndex)
+	if err != nil {
 		return nil, err
 	}
-	return ve.Val, ve.Err
+	return val[0].(*ffi.PartitionProof), nil
+}
+func SealPreCommitPhase2(
+	phase1Output []byte,
+	cacheDirPath string,
+	sealedSectorPath string,
+) (sealedCID cid.Cid, unsealedCID cid.Cid, err error) {
+	val, err := call("SealPreCommitPhase2", phase1Output, cacheDirPath, sealedSectorPath)
+	if err != nil {
+		return cid.Undef, cid.Undef, err
+	}
+	return val[0].(cid.Cid), val[1].(cid.Cid), nil
 }
 
-// FUTURE?: be snazzy and generate + reflect all FFIWrapper methods.
-type CurioFFIWrap struct {
-	Layers []string
-}
-
-func (fcw *CurioFFIWrap) GenerateSingleVanillaProof(
-	replica ffi.PrivateSectorInfo,
-	challenges []uint64,
+func SealCommitPhase2(
+	phase1Output []byte,
+	sectorNum abi.SectorNumber,
+	minerID abi.ActorID,
 ) ([]byte, error) {
-	res, err := call(fcw.Layers, "GenerateSingleVanillaProof", replica, challenges)
+	val, err := call("SealCommitPhase2", phase1Output, sectorNum, minerID)
 	if err != nil {
 		return nil, err
 	}
-	return res[0].([]byte), res[1].(error)
+
+	return val[0].([]byte), nil
 }
 
-func (fcw *CurioFFIWrap) GenerateWinningPoStWithVanilla(ctx context.Context, proofType abi.RegisteredPoStProof, minerID abi.ActorID, randomness abi.PoStRandomness, vanillas [][]byte) ([]proof.PoStProof, error) {
-	res, err := call(fcw.Layers, "GenerateWinningPoStWithVanilla", proofType, minerID, randomness, vanillas)
+func GenerateWinningPoStWithVanilla(
+	proofType abi.RegisteredPoStProof,
+	minerID abi.ActorID,
+	randomness abi.PoStRandomness,
+	proofs [][]byte,
+) ([]proof.PoStProof, error) {
+	val, err := call("GenerateWinningPoStWithVanilla", proofType, minerID, randomness, proofs)
 	if err != nil {
 		return nil, err
 	}
-	return res[0].([]proof.PoStProof), res[1].(error)
+	return val[0].([]proof.PoStProof), nil
 }
 
-func (fcw *CurioFFIWrap) GenerateWindowPoStWithVanilla(ctx context.Context, proofType abi.RegisteredPoStProof, minerID abi.ActorID, randomness abi.PoStRandomness, proofs [][]byte, partitionIdx int) (proof.PoStProof, error) {
-	res, err := call(fcw.Layers, "GenerateWindowPoStWithVanilla", proofType, minerID, randomness, proofs, partitionIdx)
+func SelfTest(val1 int, val2 cid.Cid) (int, cid.Cid, error) {
+	val, err := call("SelfTest", val1, val2)
 	if err != nil {
-		return proof.PoStProof{}, err
+		return 0, cid.Undef, err
 	}
-	return res[0].(proof.PoStProof), res[1].(error)
+	return val[0].(int), val[1].(cid.Cid), nil
 }
 
-func (fcw *CurioFFIWrap) SealCommit2(ctx context.Context, sector storiface.SectorRef, phase1Out storiface.Commit1Out) (storiface.Proof, error) {
-	res, err := call(fcw.Layers, "SealCommit2", sector, phase1Out)
-	if err != nil {
-		return storiface.Proof{}, err
-	}
-	return res[0].(storiface.Proof), res[1].(error)
-}
+// //////////////////////////
 
-func (fcw *CurioFFIWrap) SealPreCommit2(ctx context.Context, sector storiface.SectorRef, phase1Out storiface.PreCommit1Out) (storiface.SectorCids, error) {
-	res, err := call(fcw.Layers, "SealPreCommit2", sector, phase1Out)
-	if err != nil {
-		return storiface.SectorCids{}, err
-	}
-	return res[0].(storiface.SectorCids), res[1].(error)
-}
-
-func (fcw *CurioFFIWrap) GenerateWindowPoSt(ctx context.Context, minerID abi.ActorID, postProofType abi.RegisteredPoStProof, sectorInfo []proof.ExtendedSectorInfo, randomness abi.PoStRandomness) ([]proof.PoStProof, []abi.SectorID, error) {
-	res, err := call(fcw.Layers, "GenerateWindowPoSt", minerID, postProofType, sectorInfo, randomness)
-	if err != nil {
-		return nil, nil, err
-	}
-	return res[0].([]proof.PoStProof), res[1].([]abi.SectorID), res[2].(error)
+func init() {
+	gob.Register(ValErr{})
+	gob.Register(FFICall{})
+	gob.Register(cid.Cid{})
+	gob.Register(abi.RegisteredPoStProof(0))
+	gob.Register(abi.ActorID(0))
+	gob.Register(abi.PoStRandomness{})
+	gob.Register(abi.SectorNumber(0))
+	gob.Register(ffi.PartitionProof{})
+	gob.Register(proof.PoStProof{})
+	gob.Register(abi.RegisteredPoStProof(0))
 }

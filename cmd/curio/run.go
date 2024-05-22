@@ -9,10 +9,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
 	"go.opencensus.io/stats"
-	"go.opencensus.io/tag"
 	"golang.org/x/xerrors"
 
-	"github.com/filecoin-project/lotus/build"
 	lcli "github.com/filecoin-project/lotus/cli"
 	"github.com/filecoin-project/lotus/cmd/curio/deps"
 	"github.com/filecoin-project/lotus/cmd/curio/rpc"
@@ -94,11 +92,7 @@ var runCmd = &cli.Command{
 			log.Errorf("ensuring tempdir exists: %s", err)
 		}
 
-		ctx, _ := tag.New(lcli.DaemonContext(cctx),
-			tag.Insert(metrics.Version, build.BuildVersion),
-			tag.Insert(metrics.Commit, build.CurrentCommit),
-			tag.Insert(metrics.NodeType, "curio"),
-		)
+		ctx := lcli.DaemonContext(cctx)
 		shutdownChan := make(chan struct{})
 		{
 			var ctxclose func()
@@ -130,6 +124,8 @@ var runCmd = &cli.Command{
 		if err != nil {
 			return err
 		}
+
+		go ffiSelfTest() // Panics on failure
 
 		taskEngine, err := tasks.StartTasks(ctx, dependencies)
 
