@@ -20,7 +20,7 @@ var DrandSchedule = map[abi.ChainEpoch]DrandEnum{
 	UpgradePhoenixHeight: DrandQuicknet,
 }
 
-const GenesisNetworkVersion = network.Version21
+const GenesisNetworkVersion = network.Version22
 
 var NetworkBundle = "butterflynet"
 var BundleOverrides map[actorstypes.Version]string
