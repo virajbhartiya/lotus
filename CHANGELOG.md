@@ -7,6 +7,7 @@
 ## New features
 
 * Add `EthSendRawTransactionUntrusted` RPC method to be used for the gateway when accepting `EthSendRawTransaction` and `eth_sendRawTransaction`. Applies a tighter limit on the number of messages in the queue from a single sender and applies additional restrictions on nonce increments. ([filecoin-project/lotus#12431](https://github.com/filecoin-project/lotus/pull/12431))
+* feat: Added `StateMinerInitialPledgeForSector` RPC method and deprecated existing `StateMinerInitialPledgeCollateral` method. Since ProveCommitSectors3 and ProveReplicaUpdates3, sector onboarding no longer includes an explicit notion of "deals", and precommit messages no longer contain deal information. This makes the existing `StateMinerInitialPledgeCollateral` unable to properly calculate pledge requirements with only the precommit. `StateMinerInitialPledgeForSector` is a new simplified calculator that simply takes duration, sector size, and verified size and estimates pledge based on current network conditions. ([filecoin-project/lotus#12384](https://github.com/filecoin-project/lotus/pull/12384)
 
 ## Improvements
 
