@@ -8,6 +8,8 @@
 
 ## Improvements
 
+- Legacy/historical Drand lookups via `StateGetBeaconEntry` now work again for all historical epochs. `StateGetBeaconEntry` now uses the on-chain beacon entries and follows the same rules for historical Drand round matching as `StateGetRandomnessFromBeacon` and the `get_beacon_randomness` FVM syscall. Be aware that there will be some some variance in matching Filecoin epochs to Drand rounds where null Filecoin rounds are involved prior to network version 14. ([filecoin-project/lotus#12428](https://github.com/filecoin-project/lotus/pull/12428)).
+
 # Node v1.29.0 / 2024-09-02
 
 This is a Lotus Node only release, which includes a variety of new features, improvements, and fixes, particularly focused on enhancing ETH RPC functionality. Key highlights of this release include:
